@@ -5,16 +5,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { PressScale } from '@/components/ui/press-scale';
-import {
-  BottomTabInset,
-  MaxContentWidth,
-  Radius,
-  Spacing,
-  scoreColor,
-  scoreSoftColor,
-} from '@/constants/theme';
+import { BottomTabInset, MaxContentWidth, Radius, Spacing, scoreColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { friendlyDate, isToday, parseKey } from '@/lib/format';
+import { friendlyDate, isToday } from '@/lib/format';
 import { useBrief } from '@/lib/store';
 import type { DayRecord } from '@/lib/types';
 
@@ -27,16 +20,18 @@ const WORKOUT_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
 
 function DayRow({ record }: { record: DayRecord }) {
   const theme = useTheme();
-  const d = parseKey(record.date);
-  const chipBg = scoreSoftColor(record.recovery, theme);
   const chipColor = scoreColor(record.recovery, theme);
+  const pos = Math.max(6, Math.min(94, record.recovery));
 
   return (
     <PressScale
       onPress={() => router.push({ pathname: '/day/[date]', params: { date: record.date } })}
       style={[styles.row, { backgroundColor: theme.card }]}>
-      <View style={[styles.scoreChip, { backgroundColor: chipBg }]}>
+      <View style={styles.scoreCol}>
         <ThemedText style={[styles.scoreText, { color: chipColor }]}>{record.recovery}</ThemedText>
+        <View style={[styles.miniTrack, { backgroundColor: theme.track }]}>
+          <View style={[styles.miniDot, { left: `${pos}%`, backgroundColor: chipColor }]} />
+        </View>
       </View>
       <View style={styles.rowText}>
         <ThemedText style={{ fontWeight: '600' }}>
@@ -110,16 +105,30 @@ const styles = StyleSheet.create({
     borderRadius: Radius.card,
     padding: Spacing.three,
   },
-  scoreChip: {
+  scoreCol: {
     width: 46,
-    height: 46,
-    borderRadius: 23,
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 5,
   },
   scoreText: {
     fontWeight: '700',
-    fontSize: 16,
+    fontSize: 17,
+    lineHeight: 18,
+  },
+  miniTrack: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+  },
+  miniDot: {
+    position: 'absolute',
+    top: -2.5,
+    marginLeft: -4.5,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   rowText: {
     flex: 1,

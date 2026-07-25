@@ -1,7 +1,8 @@
 /**
- * Brief's design tokens — Apple Health in light mode, WHOOP in dark.
- * Light: white cards on system gray, vivid metric colors, bold numerals.
- * Dark: near-black, elevated charcoal cards, punchy traffic-light accents.
+ * Brief's design tokens — the "Spectrum" direction (Brief Redesign 2a).
+ * Light: warm paper, white cards, calm sage / slate / tan accents — recovery
+ * read as a position on a RECOVER · STEADY · READY spectrum, never a progress ring.
+ * Dark: a coordinated warm-charcoal counterpart of the same palette.
  */
 
 import '@/global.css';
@@ -10,68 +11,76 @@ import { Platform } from 'react-native';
 
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#F2F2F7',
-    backgroundElement: '#EFEFF4',
-    backgroundSelected: '#E5E5EA',
-    textSecondary: '#6C6C70',
+    text: '#26262A',
+    background: '#EEEAE3',
+    backgroundElement: '#E7E2D9',
+    backgroundSelected: '#DED8CC',
+    textSecondary: '#6E6E76',
     card: '#FFFFFF',
-    hairline: '#E5E5EA',
-    accent: '#007AFF',
-    accentSoft: '#E9F2FF',
-    good: '#34C759',
-    goodSoft: '#E6F8EC',
-    warn: '#FF9500',
-    warnSoft: '#FFF2E0',
-    low: '#FF3B30',
-    lowSoft: '#FFEAE8',
-    heart: '#FF2D55',
-    energy: '#FF9500',
-    stress: '#32ADE6',
-    sleep: '#5E5CE6',
-    track: '#E5E5EA',
+    hairline: '#E8E6E1',
+    accent: '#5E7E9B', // slate — links, HRV, energy
+    accentSoft: '#E9EEF3',
+    good: '#6F9A80', // sage — "ready", resting HR
+    goodSoft: '#E9F0EB',
+    warn: '#B08D57', // tan — "recover", sleep
+    warnSoft: '#F4EDE1',
+    low: '#B0736A', // muted clay — used sparingly, never red
+    lowSoft: '#F1E4DF',
+    heart: '#5E7E9B',
+    energy: '#5E7E9B',
+    stress: '#6F9A80',
+    sleep: '#B08D57',
+    track: '#ECEAE4',
+    zoneRecover: '#EFE5D2',
+    zoneSteady: '#DCE5EC',
+    zoneReady: '#DDE9E1',
+    baseline: '#B9B6AE',
   },
   dark: {
-    text: '#FFFFFF',
-    background: '#0B0D10',
-    backgroundElement: '#22262B',
-    backgroundSelected: '#2C3138',
-    textSecondary: '#9BA1A8',
-    card: '#16191E',
-    hairline: '#24282E',
-    accent: '#0A84FF',
-    accentSoft: '#132A42',
-    good: '#30D158',
-    goodSoft: '#12291A',
-    warn: '#FFD60A',
-    warnSoft: '#2E2912',
-    low: '#FF453A',
-    lowSoft: '#331512',
-    heart: '#FF375F',
-    energy: '#FF9F0A',
-    stress: '#64D2FF',
-    sleep: '#7D7AFF',
-    track: '#23272D',
+    text: '#F3F0E9',
+    background: '#1A1917',
+    backgroundElement: '#26241F',
+    backgroundSelected: '#2F2C25',
+    textSecondary: '#A6A199',
+    card: '#221F1A',
+    hairline: '#322E27',
+    accent: '#8AA8C2',
+    accentSoft: '#233240',
+    good: '#88B79B',
+    goodSoft: '#1F2C24',
+    warn: '#C9A876',
+    warnSoft: '#2E2717',
+    low: '#C48C82',
+    lowSoft: '#2E211E',
+    heart: '#8AA8C2',
+    energy: '#8AA8C2',
+    stress: '#88B79B',
+    sleep: '#C9A876',
+    track: '#322E27',
+    zoneRecover: '#3A3327',
+    zoneSteady: '#28323C',
+    zoneReady: '#27342C',
+    baseline: '#6A665E',
   },
 } as const;
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 export type Theme = (typeof Colors)['light'] | (typeof Colors)['dark'];
 
-/** Recovery score → WHOOP-style traffic light. */
+/** Recovery score → spectrum position color: sage (ready) · slate (steady) · tan (recover). */
 export function scoreColor(score: number, theme: Theme): string {
   if (score >= 70) return theme.good;
-  if (score >= 50) return theme.warn;
-  return theme.low;
+  if (score >= 55) return theme.accent;
+  return theme.warn;
 }
 
 export function scoreSoftColor(score: number, theme: Theme): string {
   if (score >= 70) return theme.goodSoft;
-  if (score >= 50) return theme.warnSoft;
-  return theme.lowSoft;
+  if (score >= 55) return theme.accentSoft;
+  return theme.warnSoft;
 }
 
-/** Mix a hex color toward white — used for ring gradients. */
+/** Mix a hex color toward white — used for soft fills and gradients. */
 export function lighten(hex: string, amount: number): string {
   const n = parseInt(hex.slice(1), 16);
   const mix = (c: number) => Math.round(c + (255 - c) * amount);
@@ -117,9 +126,9 @@ export const Spacing = {
 } as const;
 
 export const Radius = {
-  card: 20,
+  card: 24,
   pill: 999,
-  small: 12,
+  small: 14,
 } as const;
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
