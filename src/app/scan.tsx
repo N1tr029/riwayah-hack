@@ -20,6 +20,7 @@ import { Waveform } from '@/components/ui/waveform';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { composeRecord, makeScanMetrics } from '@/lib/engine';
+import { isFingerFrame } from '@/lib/finger';
 import { todayKey } from '@/lib/format';
 import { gentleWarning, heartbeat, success, tapLight } from '@/lib/haptics';
 import { useBrief } from '@/lib/store';
@@ -27,6 +28,7 @@ import type { Confidence } from '@/lib/types';
 
 const NATIVE_SECONDS = 30;
 const WEB_SECONDS = 8;
+const DETECT_INTERVAL_MS = 420;
 
 type Phase = 'intro' | 'measuring' | 'retry' | 'processing';
 
@@ -41,11 +43,21 @@ export default function ScanScreen() {
   const [phase, setPhase] = useState<Phase>('intro');
   const [elapsed, setElapsed] = useState(0);
   const [moving, setMoving] = useState(false);
+  const [fingerOn, setFingerOn] = useState(false);
   const [processingLine, setProcessingLine] = useState('Reading your morning…');
+
+  const cameraRef = useRef<CameraView>(null);
   const movementCount = useRef(0);
   const movingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const elapsedRef = useRef(0);
+  const fingerOnRef = useRef(false);
+  const detectFailures = useRef(0);
+  const detectionDead = useRef(false);
 
   const useCamera = !isWeb && permission?.granted === true;
+  // Without a camera (web, denied permission, or detection failure) the
+  // counter runs unconditionally, like a plain timed scan.
+  const gating = useCamera && !detectionDead.current;
 
   const start = useCallback(async () => {
     tapLight();
@@ -53,6 +65,10 @@ export default function ScanScreen() {
       await requestPermission().catch(() => {});
     }
     movementCount.current = 0;
+    elapsedRef.current = 0;
+    detectFailures.current = 0;
+    fingerOnRef.current = false;
+    setFingerOn(false);
     setElapsed(0);
     setPhase('measuring');
   }, [isWeb, permission?.granted, requestPermission]);
@@ -93,15 +109,17 @@ export default function ScanScreen() {
     complete(confidence);
   }, [complete]);
 
-  // Measurement loop: timer + heartbeat haptics + real motion detection.
+  // Measurement loop: the timer advances only while a finger covers the lens
+  // (or always, when there is no camera to check with).
   useEffect(() => {
     if (phase !== 'measuring') return;
 
-    const t0 = Date.now();
     const timer = setInterval(() => {
-      const e = (Date.now() - t0) / 1000;
-      setElapsed(Math.min(e, duration));
-      if (e >= duration) {
+      const counting = fingerOnRef.current || !useCamera || detectionDead.current;
+      if (!counting) return;
+      elapsedRef.current += 0.2;
+      setElapsed(Math.min(elapsedRef.current, duration));
+      if (elapsedRef.current >= duration) {
         clearInterval(timer);
         finish();
       }
@@ -109,7 +127,9 @@ export default function ScanScreen() {
 
     let beat: ReturnType<typeof setInterval> | undefined;
     if (settings.haptics) {
-      beat = setInterval(() => heartbeat(), 880);
+      beat = setInterval(() => {
+        if (fingerOnRef.current || !useCamera || detectionDead.current) heartbeat();
+      }, 880);
     }
 
     let sub: { remove: () => void } | undefined;
@@ -131,9 +151,70 @@ export default function ScanScreen() {
       if (beat) clearInterval(beat);
       sub?.remove();
     };
-  }, [phase, duration, finish, isWeb, settings.haptics]);
+  }, [phase, duration, finish, isWeb, settings.haptics, useCamera]);
+
+  // Finger detection: snap tiny stills and look for the torch-through-tissue
+  // red signature. Falls back to an ungated timer if capture keeps failing.
+  useEffect(() => {
+    if (phase !== 'measuring' || !useCamera) return;
+    let stopped = false;
+
+    const loop = async () => {
+      // Give the camera a moment to warm up before the first capture.
+      await new Promise((r) => setTimeout(r, 700));
+      while (!stopped && !detectionDead.current) {
+        const t0 = Date.now();
+        try {
+          const pic = await cameraRef.current?.takePictureAsync({
+            quality: 0,
+            base64: true,
+            skipProcessing: true,
+            shutterSound: false,
+          });
+          if (stopped) return;
+          if (pic?.base64) {
+            const finger = isFingerFrame(pic.base64);
+            detectFailures.current = 0;
+            if (finger !== fingerOnRef.current) {
+              fingerOnRef.current = finger;
+              setFingerOn(finger);
+              if (finger) tapLight();
+            }
+          }
+        } catch {
+          detectFailures.current += 1;
+          if (detectFailures.current > 4) {
+            // Camera won't give us frames — degrade to a plain timed scan.
+            detectionDead.current = true;
+            fingerOnRef.current = true;
+            setFingerOn(true);
+          }
+        }
+        const dt = Date.now() - t0;
+        await new Promise((r) => setTimeout(r, Math.max(DETECT_INTERVAL_MS - dt, 80)));
+      }
+    };
+    loop();
+
+    return () => {
+      stopped = true;
+    };
+  }, [phase, useCamera]);
 
   const remaining = Math.max(0, Math.ceil(duration - elapsed));
+  const waiting = gating && !fingerOn;
+  const paused = waiting && elapsed > 0;
+
+  const headline = waiting
+    ? paused
+      ? 'Scan paused.'
+      : 'Waiting for your fingertip…'
+    : moving
+      ? 'Gently hold still.'
+      : 'Reading your pulse…';
+  const caption = waiting
+    ? 'Cover the rear camera and flash completely with your fingertip.'
+    : 'Keep your fingertip over the camera and flash.';
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -158,7 +239,7 @@ export default function ScanScreen() {
             </ThemedText>
             <View style={styles.steps}>
               <Step theme={theme} icon="hand-left-outline" text="Place your fingertip gently over the rear camera and flash." />
-              <Step theme={theme} icon="pause-outline" text="Rest your hand somewhere steady." />
+              <Step theme={theme} icon="play-outline" text="The scan starts on its own once your finger is detected." />
               <Step theme={theme} icon="leaf-outline" text={`Breathe normally — about ${duration} seconds.`} />
             </View>
             {isWeb && (
@@ -175,8 +256,16 @@ export default function ScanScreen() {
         {phase === 'measuring' && (
           <View style={styles.body}>
             {useCamera ? (
-              <View style={[styles.cameraDot, { borderColor: theme.hairline }]}>
-                <CameraView style={styles.camera} facing="back" enableTorch animateShutter={false} mute />
+              <View style={[styles.cameraDot, { borderColor: fingerOn ? theme.sage : theme.hairline }]}>
+                <CameraView
+                  ref={cameraRef}
+                  style={styles.camera}
+                  facing="back"
+                  enableTorch
+                  animateShutter={false}
+                  mute
+                  pictureSize="640x480"
+                />
               </View>
             ) : (
               <View style={[styles.iconCircle, { backgroundColor: theme.accentSoft }]}>
@@ -184,15 +273,17 @@ export default function ScanScreen() {
               </View>
             )}
 
-            <ProgressRing progress={elapsed / duration} remaining={remaining} />
+            <ProgressRing progress={elapsed / duration} remaining={remaining} dimmed={waiting} />
 
-            <Waveform color={theme.accent} />
+            <View style={{ alignSelf: 'stretch', opacity: waiting ? 0.25 : 1 }}>
+              <Waveform color={theme.accent} />
+            </View>
 
             <ThemedText type="subtitle" style={styles.centerText}>
-              {moving ? 'Gently hold still.' : 'Reading your pulse…'}
+              {headline}
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary" style={styles.centerText}>
-              Keep your fingertip over the camera and flash.
+              {caption}
             </ThemedText>
           </View>
         )}
@@ -243,7 +334,7 @@ function Step({ theme, icon, text }: { theme: ReturnType<typeof useTheme>; icon:
   );
 }
 
-function ProgressRing({ progress, remaining }: { progress: number; remaining: number }) {
+function ProgressRing({ progress, remaining, dimmed }: { progress: number; remaining: number; dimmed?: boolean }) {
   const theme = useTheme();
   const size = 168;
   const strokeWidth = 10;
@@ -258,7 +349,7 @@ function ProgressRing({ progress, remaining }: { progress: number; remaining: nu
           cx={size / 2}
           cy={size / 2}
           r={r}
-          stroke={theme.accent}
+          stroke={dimmed ? theme.track : theme.accent}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           fill="none"
@@ -358,7 +449,7 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 32,
     overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 2,
   },
   camera: {
     flex: 1,
