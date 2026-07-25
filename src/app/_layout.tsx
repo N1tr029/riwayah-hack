@@ -1,18 +1,46 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import { Colors } from '@/constants/theme';
+import { BriefProvider } from '@/lib/store';
 
-SplashScreen.preventAutoHideAsync();
+export default function RootLayout() {
+  const scheme = useColorScheme();
+  const theme = Colors[scheme === 'dark' ? 'dark' : 'light'];
+  const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
+  const navTheme = {
+    ...base,
+    colors: {
+      ...base.colors,
+      background: theme.background,
+      card: theme.card,
+      text: theme.text,
+      border: theme.hairline,
+      primary: theme.accent,
+    },
+  };
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
+    <ThemeProvider value={navTheme}>
+      <BriefProvider>
+        <StatusBar style="auto" />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: theme.background },
+          }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen
+            name="scan"
+            options={{ presentation: 'fullScreenModal', gestureEnabled: false, animation: 'fade' }}
+          />
+          <Stack.Screen name="brief" options={{ animation: 'fade' }} />
+          <Stack.Screen name="day/[date]" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="details" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
+        </Stack>
+      </BriefProvider>
     </ThemeProvider>
   );
 }
