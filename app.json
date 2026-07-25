@@ -13,7 +13,12 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      }
+      },
+      "permissions": [
+        "android.permission.health.WRITE_HEART_RATE",
+        "android.permission.health.WRITE_RESTING_HEART_RATE",
+        "android.permission.health.WRITE_HEART_RATE_VARIABILITY"
+      ]
     },
     "web": {
       "output": "static",
@@ -31,6 +36,21 @@
             "backgroundColor": "#0B0D10",
             "image": "./assets/images/splash-icon.png"
           }
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ],
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "Brief shows your morning readiness alongside your existing health data.",
+          "NSHealthUpdateUsageDescription": "Brief writes your scan heart rate and overnight resting heart rate to Apple Health."
         }
       ]
     ],

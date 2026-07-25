@@ -21,7 +21,7 @@ on-device in Expo Go.
 | Design language (calm, muted, no red) | ✅ | Palette contrast validated by script in light + dark |
 | Settings | ✅ | Reminder time, haptics, advanced toggle, units field, export, reset |
 | Notifications | ⚠️ stub | Preference stored; scheduling needs expo-notifications in a dev build |
-| HealthKit | ⚠️ stub | Marked "coming soon" — needs a dev build, native module |
+| HealthKit / Health Connect | ✅ (dev build) | Writes HR + resting HR (both), HRV RMSSD (Android); toggle self-disables in Expo Go |
 | Real camera PPG | ⚠️ seam | `makeScanMetrics` in src/lib/engine.ts is the swap-in point; Expo Go cannot read camera frames |
 | Unit tests | ✅ | 18 tests over engine scoring, tone, determinism, patterns, streaks |
 | Snapshot tests | ❌ | Not yet |

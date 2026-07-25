@@ -35,6 +35,23 @@ Scan the QR code with your phone (iPhone: Camera app; Android: from inside Expo 
 - `src/lib/` — engine, patterns, storage, seed data
 - `src/constants/theme.ts` — the calm palette (light + dark)
 
+## Health sync (Apple Health / Google Health Connect)
+
+Brief can write each scan's heart rate + overnight resting heart rate to **Apple Health** (iOS)
+and **Health Connect** (Android, incl. HRV RMSSD). This needs native modules, so it does NOT work
+inside Expo Go — the Settings toggle stays disabled there and explains why.
+
+To use it, make a development build:
+
+- **iOS (needs a Mac + Xcode):** `npx expo run:ios --device` — installs a dev build with
+  HealthKit entitlements on a plugged-in iPhone. Then enable the toggle in Settings.
+- **Android:** `npx expo run:android` (Android Studio) or
+  `eas build --profile development --platform android` in the cloud — no local toolchain needed.
+  Requires Health Connect installed (built into Android 14+).
+
+The integration lives in [src/lib/health.ts](src/lib/health.ts) and fails soft: if the health
+write fails, the briefing still completes.
+
 ## Team workflow
 
 - Everyone runs their **own** dev server and sees their **own** copy on their own phone — share code through Git, pull often.

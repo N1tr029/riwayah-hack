@@ -9,6 +9,7 @@ import { PressScale } from '@/components/ui/press-scale';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { tapLight } from '@/lib/haptics';
+import { healthPlatformName, healthSupported, requestHealthPermissions } from '@/lib/health';
 import { useBrief } from '@/lib/store';
 
 const REMINDER_TIMES = ['6:30 AM', '7:00 AM', '7:30 AM', '8:00 AM'];
@@ -116,8 +117,33 @@ export default function SettingsScreen() {
           </Card>
 
           <Card style={styles.group}>
-            <Row label="Apple Health" hint="Coming soon — needs a development build">
-              <Ionicons name="heart-circle-outline" size={22} color={theme.textSecondary} />
+            <Row
+              label={healthPlatformName()}
+              hint={
+                healthSupported()
+                  ? 'Write heart rate to your health app after each scan'
+                  : 'Needs a development build — not available in Expo Go'
+              }>
+              <Switch
+                value={settings.healthSync}
+                disabled={!healthSupported()}
+                onValueChange={async (v) => {
+                  if (!v) {
+                    setSettings({ healthSync: false });
+                    return;
+                  }
+                  const granted = await requestHealthPermissions();
+                  setSettings({ healthSync: granted });
+                  if (!granted && Platform.OS !== 'web') {
+                    Alert.alert(
+                      'Permission needed',
+                      `Allow Brief to write heart data in ${healthPlatformName()} to turn this on.`
+                    );
+                  }
+                }}
+                trackColor={{ true: theme.accent }}
+                accessibilityLabel={`Sync to ${healthPlatformName()}`}
+              />
             </Row>
             <PressScale onPress={exportData}>
               <Row label="Export data" hint="Share your history as JSON">

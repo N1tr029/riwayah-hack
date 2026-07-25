@@ -38,6 +38,8 @@ export interface AppSettings {
   reminderTime: string;
   units: 'metric' | 'imperial';
   haptics: boolean;
+  /** Write heart data to Apple Health / Health Connect after each scan. */
+  healthSync: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -46,6 +48,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   reminderTime: '7:30 AM',
   units: 'metric',
   haptics: true,
+  healthSync: false,
 };
 
 export interface PatternObservation {

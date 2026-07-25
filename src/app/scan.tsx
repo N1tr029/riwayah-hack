@@ -21,6 +21,7 @@ import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { composeRecord, makeScanMetrics } from '@/lib/engine';
 import { isFingerFrame } from '@/lib/finger';
+import { exportRecordToHealth } from '@/lib/health';
 import { todayKey } from '@/lib/format';
 import { gentleWarning, heartbeat, success, tapLight } from '@/lib/haptics';
 import { useBrief } from '@/lib/store';
@@ -88,6 +89,9 @@ export default function ScanScreen() {
       const metrics = makeScanMetrics(history, seed);
       const record = composeRecord(tk, metrics, history, confidence, seed);
       saveRecord(record);
+      if (settings.healthSync) {
+        exportRecordToHealth(record).catch(() => {});
+      }
 
       setTimeout(() => {
         clearTimeout(line2);
