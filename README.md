@@ -52,6 +52,15 @@ To use it, make a development build:
 The integration lives in [src/lib/health.ts](src/lib/health.ts) and fails soft: if the health
 write fails, the briefing still completes.
 
+## Runs + Strava
+
+The Run tab plans a workout: your intent (easy / tempo / long) sets how often the phone buzzes
+for a fingertip heart rate check (every 10 / 5 / 15 min). Each check becomes a heart rate
+trackpoint; finished runs export as TCX and upload to Strava (`activity:write`). One-tap sync
+needs a Strava API app — see `.env.example`; without it, share the TCX file instead. Checkpoint
+buzzes also fire as local notifications so they reach you mid-run with the screen locked
+(dev build; in Expo Go the in-app haptics still work while the app is open).
+
 ## Team workflow
 
 - Everyone runs their **own** dev server and sees their **own** copy on their own phone — share code through Git, pull often.
