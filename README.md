@@ -1,6 +1,6 @@
 # Brief — the morning briefing for your body
 
-A daily readiness app built with [Expo](https://expo.dev) (React Native, SDK 57). Open it each morning, run a calm ~30-second scan, and get one clear briefing: how you recovered, how much energy you have, and one mission for the day. No jargon, no charts you don't need.
+A daily readiness app built with [Expo](https://expo.dev) (React Native, SDK 54 — pinned to what the app-store Expo Go clients support). Open it each morning, run a calm ~30-second scan, and get one clear briefing: how you recovered, how much energy you have, and one mission for the day. No jargon, no charts you don't need.
 
 Built at a hackathon by a mixed Mac/Windows team — everything below works the same on both.
 
