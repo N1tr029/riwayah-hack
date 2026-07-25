@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+# local Claude Code tooling (audit agent etc.) — never push, dev-only
+.claude/
