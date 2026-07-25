@@ -114,6 +114,16 @@ export default function SettingsScreen() {
                 accessibilityLabel="Advanced metrics"
               />
             </Row>
+            <Row
+              label="Experimental face pulse"
+              hint="Research only — never affects your readiness score">
+              <Switch
+                value={settings.faceResearch}
+                onValueChange={(v) => setSettings({ faceResearch: v })}
+                trackColor={{ true: theme.accent }}
+                accessibilityLabel="Experimental face pulse research"
+              />
+            </Row>
           </Card>
 
           <Card style={styles.group}>

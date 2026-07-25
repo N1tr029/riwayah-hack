@@ -11,6 +11,7 @@ import { PressScale } from '@/components/ui/press-scale';
 import { BottomTabInset, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { friendlyDate } from '@/lib/format';
+import { formatMiles } from '@/lib/geo';
 import { tapLight } from '@/lib/haptics';
 import { useBrief } from '@/lib/store';
 import {
@@ -211,7 +212,8 @@ export default function RunScreen() {
                   <View style={styles.runText}>
                     <ThemedText style={{ fontWeight: '700' }}>{runName(w.type)}</ThemedText>
                     <ThemedText type="small" themeColor="textSecondary">
-                      {friendlyDate(w.date)} · {formatDuration(w.durationSec)} · avg {w.avgHr} bpm
+                      {friendlyDate(w.date)} · {formatDuration(w.durationSec)} ·{' '}
+                      {formatMiles(w.distanceMeters ?? 0)} mi · avg {w.avgHr} bpm
                     </ThemedText>
                   </View>
                   {w.uploadedToStrava ? (

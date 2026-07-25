@@ -59,6 +59,13 @@ export interface WorkoutSample {
   captured: boolean;
 }
 
+export interface RoutePoint {
+  lat: number;
+  lon: number;
+  /** Seconds since the run started. */
+  atSec: number;
+}
+
 export interface WorkoutSession {
   id: string;
   /** YYYY-MM-DD */
@@ -71,6 +78,9 @@ export interface WorkoutSession {
   samples: WorkoutSample[];
   avgHr: number;
   maxHr: number;
+  distanceMeters: number;
+  /** Decimated GPS trace; empty when GPS was unavailable/simulated. */
+  route: RoutePoint[];
   uploadedToStrava?: boolean;
 }
 
@@ -109,23 +119,48 @@ function xmlTime(d: Date): string {
   return d.toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
+/** Nearest heart rate sample to a moment in the run. */
+function hrAt(samples: WorkoutSample[], atSec: number): number | null {
+  if (samples.length === 0) return null;
+  let best = samples[0];
+  for (const s of samples) {
+    if (Math.abs(s.atSec - atSec) < Math.abs(best.atSec - atSec)) best = s;
+  }
+  return best.hr;
+}
+
 /**
- * TCX with heart rate trackpoints (no GPS — Strava treats it like a
- * treadmill run but keeps the heart rate stream).
+ * TCX for Strava. With GPS, trackpoints carry position + heart rate;
+ * without, it's an HR-only stream (treadmill-style import).
  */
 export function buildTcx(session: WorkoutSession): string {
   const start = new Date(session.startedAt);
-  const points = session.samples
-    .map((s) => {
-      const t = new Date(start.getTime() + s.atSec * 1000);
-      return [
-        '        <Trackpoint>',
-        `          <Time>${xmlTime(t)}</Time>`,
-        `          <HeartRateBpm><Value>${s.hr}</Value></HeartRateBpm>`,
-        '        </Trackpoint>',
-      ].join('\n');
-    })
-    .join('\n');
+
+  const trackpoint = (atSec: number, pos?: { lat: number; lon: number }): string => {
+    const t = new Date(start.getTime() + atSec * 1000);
+    const hr = hrAt(session.samples, atSec);
+    return [
+      '        <Trackpoint>',
+      `          <Time>${xmlTime(t)}</Time>`,
+      ...(pos
+        ? [
+            '          <Position>',
+            `            <LatitudeDegrees>${pos.lat.toFixed(6)}</LatitudeDegrees>`,
+            `            <LongitudeDegrees>${pos.lon.toFixed(6)}</LongitudeDegrees>`,
+            '          </Position>',
+          ]
+        : []),
+      ...(hr !== null ? [`          <HeartRateBpm><Value>${hr}</Value></HeartRateBpm>`] : []),
+      '        </Trackpoint>',
+    ].join('\n');
+  };
+
+  const route = session.route ?? [];
+  const points = (
+    route.length >= 2
+      ? route.map((p) => trackpoint(p.atSec, p))
+      : session.samples.map((s) => trackpoint(s.atSec))
+  ).join('\n');
 
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -135,7 +170,7 @@ export function buildTcx(session: WorkoutSession): string {
     `      <Id>${xmlTime(start)}</Id>`,
     `      <Lap StartTime="${xmlTime(start)}">`,
     `        <TotalTimeSeconds>${session.durationSec}</TotalTimeSeconds>`,
-    '        <DistanceMeters>0</DistanceMeters>',
+    `        <DistanceMeters>${Math.round(session.distanceMeters ?? 0)}</DistanceMeters>`,
     `        <AverageHeartRateBpm><Value>${session.avgHr}</Value></AverageHeartRateBpm>`,
     `        <MaximumHeartRateBpm><Value>${session.maxHr}</Value></MaximumHeartRateBpm>`,
     '        <Intensity>Active</Intensity>',

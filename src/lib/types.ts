@@ -40,6 +40,8 @@ export interface AppSettings {
   haptics: boolean;
   /** Write heart data to Apple Health / Health Connect after each scan. */
   healthSync: boolean;
+  /** Experimental face-pulse research feature (never affects readiness). */
+  faceResearch: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -49,6 +51,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   units: 'metric',
   haptics: true,
   healthSync: false,
+  faceResearch: false,
 };
 
 export interface PatternObservation {

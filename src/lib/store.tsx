@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { buildSeedHistory } from '@/lib/seed';
+import type { FrontCameraScanResult } from '@/lib/face';
 import { todayKey } from '@/lib/format';
 import { DEFAULT_SETTINGS, type AppSettings, type DayRecord } from '@/lib/types';
 import type { WorkoutSession } from '@/lib/workout';
@@ -9,6 +10,7 @@ import type { WorkoutSession } from '@/lib/workout';
 const RECORDS_KEY = 'brief.records.v1';
 const SETTINGS_KEY = 'brief.settings.v1';
 const WORKOUTS_KEY = 'brief.workouts.v1';
+const FACE_KEY = 'brief.face.v1';
 
 interface BriefStore {
   ready: boolean;
@@ -22,6 +24,8 @@ interface BriefStore {
   workouts: WorkoutSession[];
   addWorkout: (workout: WorkoutSession) => void;
   updateWorkout: (id: string, patch: Partial<WorkoutSession>) => void;
+  faceScans: FrontCameraScanResult[];
+  addFaceScan: (scan: FrontCameraScanResult) => void;
   settings: AppSettings;
   setSettings: (patch: Partial<AppSettings>) => void;
   resetAll: () => void;
@@ -33,15 +37,17 @@ export function BriefProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [records, setRecords] = useState<DayRecord[]>([]);
   const [workouts, setWorkouts] = useState<WorkoutSession[]>([]);
+  const [faceScans, setFaceScans] = useState<FrontCameraScanResult[]>([]);
   const [settings, setSettingsState] = useState<AppSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
     (async () => {
       try {
-        const [rawRecords, rawSettings, rawWorkouts] = await Promise.all([
+        const [rawRecords, rawSettings, rawWorkouts, rawFace] = await Promise.all([
           AsyncStorage.getItem(RECORDS_KEY),
           AsyncStorage.getItem(SETTINGS_KEY),
           AsyncStorage.getItem(WORKOUTS_KEY),
+          AsyncStorage.getItem(FACE_KEY),
         ]);
         if (rawRecords) {
           setRecords(JSON.parse(rawRecords));
@@ -52,6 +58,7 @@ export function BriefProvider({ children }: { children: React.ReactNode }) {
         }
         if (rawSettings) setSettingsState({ ...DEFAULT_SETTINGS, ...JSON.parse(rawSettings) });
         if (rawWorkouts) setWorkouts(JSON.parse(rawWorkouts));
+        if (rawFace) setFaceScans(JSON.parse(rawFace));
       } catch {
         setRecords(buildSeedHistory());
       } finally {
@@ -102,6 +109,14 @@ export function BriefProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const addFaceScan = useCallback((scan: FrontCameraScanResult) => {
+    setFaceScans((prev) => {
+      const next = [...prev.filter((s) => s.date !== scan.date), scan];
+      AsyncStorage.setItem(FACE_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
   const setSettings = useCallback((patch: Partial<AppSettings>) => {
     setSettingsState((prev) => {
       const next = { ...prev, ...patch };
@@ -129,11 +144,13 @@ export function BriefProvider({ children }: { children: React.ReactNode }) {
       workouts,
       addWorkout,
       updateWorkout,
+      faceScans,
+      addFaceScan,
       settings,
       setSettings,
       resetAll,
     };
-  }, [ready, records, workouts, settings, saveRecord, updateDay, addWorkout, updateWorkout, setSettings, resetAll]);
+  }, [ready, records, workouts, faceScans, settings, saveRecord, updateDay, addWorkout, updateWorkout, addFaceScan, setSettings, resetAll]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -39,6 +39,14 @@
         }
       ],
       [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Brief tracks your route during runs so distance and pace stay accurate, even with music open or the screen locked.",
+          "locationWhenInUsePermission": "Brief uses your location during runs to measure distance and pace.",
+          "isIosBackgroundLocationEnabled": true
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "android": {

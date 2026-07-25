@@ -40,6 +40,10 @@ export default function RootLayout() {
             name="run-session"
             options={{ presentation: 'fullScreenModal', gestureEnabled: false, animation: 'fade' }}
           />
+          <Stack.Screen
+            name="face-scan"
+            options={{ presentation: 'fullScreenModal', animation: 'fade' }}
+          />
           <Stack.Screen name="brief" options={{ animation: 'fade' }} />
           <Stack.Screen name="day/[date]" options={{ presentation: 'modal' }} />
           <Stack.Screen name="details" options={{ presentation: 'modal' }} />

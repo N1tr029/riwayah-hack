@@ -16,6 +16,16 @@ import { Fonts, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { isFingerFrame } from '@/lib/finger';
 import { dateKey } from '@/lib/format';
+import {
+  drainPoints,
+  formatMiles,
+  formatPace,
+  haversineMeters,
+  simulatedSpeed,
+  startRunTracking,
+  type GeoPoint,
+  type TrackingMode,
+} from '@/lib/geo';
 import { gentleWarning, heartbeat, success, tapLight } from '@/lib/haptics';
 import { useBrief } from '@/lib/store';
 import {
@@ -23,6 +33,7 @@ import {
   runHeartRate,
   runName,
   summarize,
+  type RoutePoint,
   type RunType,
   type WorkoutSample,
 } from '@/lib/workout';
@@ -75,7 +86,7 @@ function formatClock(sec: number): string {
   return `${m}:${`${s}`.padStart(2, '0')}`;
 }
 
-type Phase = 'running' | 'check' | 'done';
+type Phase = 'calibrate' | 'running' | 'check' | 'done';
 
 export default function RunSessionScreen() {
   const theme = useTheme();
@@ -88,6 +99,25 @@ export default function RunSessionScreen() {
   const [permission, requestPermission] = useCameraPermissions();
 
   const isWeb = Platform.OS === 'web';
+  const checkpoints = useRef(checkpointsFor(type, plannedMin)).current;
+  const startRef = useRef<number | null>(null);
+  const seedRef = useRef((Date.now() % 1e9) | 0);
+  const cameraRef = useRef<CameraView>(null);
+
+  const [phase, setPhase] = useState<Phase>('calibrate');
+  const [elapsed, setElapsed] = useState(0);
+  const [samples, setSamples] = useState<WorkoutSample[]>([]);
+  const [distance, setDistance] = useState(0);
+  const [trackingMode, setTrackingMode] = useState<TrackingMode>('simulated');
+  const [checkStartedAt, setCheckStartedAt] = useState(0);
+  const nextCheckIdx = useRef(0);
+  const savedRef = useRef(false);
+  const lastPointRef = useRef<GeoPoint | null>(null);
+  const distanceRef = useRef(0);
+  const routeRef = useRef<RoutePoint[]>([]);
+  const stopTrackingRef = useRef<() => void>(() => {});
+
+  const useCam = !isWeb && permission?.granted === true;
 
   // Keep the screen on for the whole run (native only — web denies wake locks).
   useEffect(() => {
@@ -97,45 +127,72 @@ export default function RunSessionScreen() {
       Promise.resolve(deactivateKeepAwake('run')).catch(() => {});
     };
   }, [isWeb]);
-  const checkpoints = useRef(checkpointsFor(type, plannedMin)).current;
-  const startRef = useRef(Date.now());
-  const seedRef = useRef((Date.now() % 1e9) | 0);
-  const cameraRef = useRef<CameraView>(null);
 
-  const [phase, setPhase] = useState<Phase>('running');
-  const [elapsed, setElapsed] = useState(0);
-  const [samples, setSamples] = useState<WorkoutSample[]>([]);
-  const [checkStartedAt, setCheckStartedAt] = useState(0);
-  const nextCheckIdx = useRef(0);
-  const savedRef = useRef(false);
-
-  const useCam = !isWeb && permission?.granted === true;
-
-  // Ask for camera up front and schedule the buzz reminders.
   useEffect(() => {
     if (!isWeb && !permission?.granted) requestPermission().catch(() => {});
-    scheduleCheckReminders(checkpoints);
-    return cancelReminders;
+    return () => {
+      cancelReminders();
+      stopTrackingRef.current();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const elapsedNow = useCallback(
+    () => (startRef.current === null ? 0 : (Date.now() - startRef.current) / 1000),
+    []
+  );
+
   const captureSample = useCallback(
     (captured: boolean) => {
-      const at = Math.round((Date.now() - startRef.current) / 1000);
+      const at = Math.round(elapsedNow());
       const hr = runHeartRate(type, at, seedRef.current);
       setSamples((prev) => [...prev, { atSec: at, hr, captured }]);
       if (captured) success();
       setPhase('running');
     },
-    [type]
+    [type, elapsedNow]
   );
 
-  // Clock. Fires checkpoints and ends the run at the planned duration.
+  /** Calibration success: stamp t=0, start GPS + reminders, go. */
+  const beginRun = useCallback(async () => {
+    startRef.current = Date.now();
+    const at0 = runHeartRate(type, 0, seedRef.current);
+    setSamples([{ atSec: 0, hr: at0, captured: true }]);
+    success();
+    setPhase('running');
+    scheduleCheckReminders(checkpoints);
+    const { mode, stop } = await startRunTracking();
+    stopTrackingRef.current = stop;
+    setTrackingMode(mode);
+  }, [type, checkpoints]);
+
+  // Clock + distance. Fires checkpoints, ends at planned duration.
   useEffect(() => {
-    if (phase === 'done') return;
+    if (phase === 'done' || phase === 'calibrate') return;
     const timer = setInterval(() => {
-      const e = (Date.now() - startRef.current) / 1000;
+      const e = elapsedNow();
       setElapsed(e);
+
+      // Distance: GPS points when we have them, simulated pace otherwise.
+      const pts = drainPoints();
+      if (pts.length > 0) {
+        for (const p of pts) {
+          if (lastPointRef.current) {
+            const d = haversineMeters(lastPointRef.current, p);
+            if (d > 0.5 && d < 100) distanceRef.current += d;
+          }
+          lastPointRef.current = p;
+          const at = Math.round(e);
+          const lastRoute = routeRef.current[routeRef.current.length - 1];
+          if (!lastRoute || at - lastRoute.atSec >= 3) {
+            routeRef.current.push({ lat: p.lat, lon: p.lon, atSec: at });
+          }
+        }
+      } else if (trackingMode === 'simulated') {
+        distanceRef.current = e * simulatedSpeed(type);
+      }
+      setDistance(distanceRef.current);
+
       if (phase === 'running') {
         const next = checkpoints[nextCheckIdx.current];
         if (next !== undefined && e >= next) {
@@ -148,9 +205,9 @@ export default function RunSessionScreen() {
       } else if (phase === 'check' && e - checkStartedAt >= CHECK_WINDOW_SEC) {
         captureSample(false);
       }
-    }, 300);
+    }, 500);
     return () => clearInterval(timer);
-  }, [phase, checkpoints, plannedMin, checkStartedAt, captureSample]);
+  }, [phase, checkpoints, plannedMin, checkStartedAt, captureSample, elapsedNow, trackingMode, type]);
 
   // The buzz: insistent haptic pattern while a check is waiting.
   useEffect(() => {
@@ -160,13 +217,14 @@ export default function RunSessionScreen() {
     return () => clearInterval(buzz);
   }, [phase]);
 
-  // Fingertip detection during a check (simulated on web).
+  // Fingertip detection: calibration at start and each mid-run check.
   useEffect(() => {
-    if (phase !== 'check') return;
+    if (phase !== 'check' && phase !== 'calibrate') return;
+    const onSuccess = phase === 'calibrate' ? beginRun : () => captureSample(true);
     let stopped = false;
 
     if (!useCam) {
-      const t = setTimeout(() => { if (!stopped) captureSample(true); }, 2500);
+      const t = setTimeout(() => { if (!stopped) onSuccess(); }, 2500);
       return () => { stopped = true; clearTimeout(t); };
     }
 
@@ -187,7 +245,7 @@ export default function RunSessionScreen() {
             consecutive += 1;
             heartbeat();
             if (consecutive >= 2) {
-              captureSample(true);
+              onSuccess();
               return;
             }
           } else {
@@ -196,7 +254,7 @@ export default function RunSessionScreen() {
         } catch {
           failures += 1;
           if (failures > 4) {
-            captureSample(true);
+            onSuccess();
             return;
           }
         }
@@ -207,10 +265,11 @@ export default function RunSessionScreen() {
     return () => {
       stopped = true;
     };
-  }, [phase, useCam, captureSample]);
+  }, [phase, useCam, captureSample, beginRun]);
 
   const finishRun = useCallback(() => {
     cancelReminders();
+    stopTrackingRef.current();
     setPhase('done');
   }, []);
 
@@ -225,11 +284,13 @@ export default function RunSessionScreen() {
       date: today,
       type,
       plannedMin,
-      startedAt: new Date(startRef.current).toISOString(),
+      startedAt: new Date(startRef.current ?? Date.now()).toISOString(),
       durationSec,
       samples,
       avgHr,
       maxHr,
+      distanceMeters: Math.round(distanceRef.current),
+      route: routeRef.current,
     });
     if (byDate(today)) updateDay(today, { workout: 'run' });
     tapLight();
@@ -239,6 +300,34 @@ export default function RunSessionScreen() {
   const captured = samples.filter((s) => s.captured).length;
   const nextCheck = checkpoints[nextCheckIdx.current];
   const { avgHr, maxHr } = summarize(samples);
+  const lastHr = samples.length > 0 ? samples[samples.length - 1].hr : null;
+
+  const fingerPrompt = (headline: string, caption: string) => (
+    <>
+      {useCam && (
+        <View style={[styles.cameraDot, { borderColor: theme.heart }]}>
+          <CameraView
+            ref={cameraRef}
+            style={styles.camera}
+            facing="back"
+            enableTorch
+            animateShutter={false}
+            mute
+            pictureSize="640x480"
+          />
+        </View>
+      )}
+      <View style={{ alignSelf: 'stretch' }}>
+        <Waveform color={theme.heart} height={70} />
+      </View>
+      <ThemedText type="subtitle" style={styles.centerText}>
+        {headline}
+      </ThemedText>
+      <ThemedText type="small" themeColor="textSecondary" style={styles.centerText}>
+        {caption}
+      </ThemedText>
+    </>
+  );
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -249,75 +338,96 @@ export default function RunSessionScreen() {
               {runName(type)}
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              {plannedMin} min planned · {captured}/{checkpoints.length} checks
+              {plannedMin} min planned · {captured}/{checkpoints.length + 1} checks
+              {trackingMode === 'simulated' ? ' · GPS simulated' : ''}
             </ThemedText>
           </View>
-          {phase !== 'done' && (
+          {phase !== 'done' && phase !== 'calibrate' && (
             <PressScale onPress={finishRun} accessibilityRole="button">
               <ThemedText style={{ color: theme.low, fontWeight: '700' }}>End Run</ThemedText>
             </PressScale>
           )}
+          {phase === 'calibrate' && (
+            <PressScale onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Cancel run">
+              <Ionicons name="close" size={24} color={theme.textSecondary} />
+            </PressScale>
+          )}
         </View>
 
-        {phase !== 'done' ? (
+        {phase === 'calibrate' && (
           <View style={styles.body}>
-            <ThemedText style={styles.clock}>{formatClock(elapsed)}</ThemedText>
-
-            {phase === 'check' ? (
-              <>
-                {useCam && (
-                  <View style={[styles.cameraDot, { borderColor: theme.heart }]}>
-                    <CameraView
-                      ref={cameraRef}
-                      style={styles.camera}
-                      facing="back"
-                      enableTorch
-                      animateShutter={false}
-                      mute
-                      pictureSize="640x480"
-                    />
-                  </View>
-                )}
-                <View style={{ alignSelf: 'stretch' }}>
-                  <Waveform color={theme.heart} height={70} />
-                </View>
-                <ThemedText type="subtitle" style={styles.centerText}>
-                  Finger on the camera.
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary" style={styles.centerText}>
-                  Quick heart rate check — keep moving, it only takes a few seconds.
-                </ThemedText>
-              </>
-            ) : (
-              <>
-                <View style={[styles.hrPill, { backgroundColor: theme.card }]}>
-                  <Ionicons name="heart" size={16} color={theme.heart} />
-                  <ThemedText style={styles.hrValue}>
-                    {samples.length > 0 ? `${samples[samples.length - 1].hr}` : '—'}
-                  </ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    bpm last check
-                  </ThemedText>
-                </View>
-                <ThemedText type="small" themeColor="textSecondary" style={styles.centerText}>
-                  {nextCheck !== undefined
-                    ? `Next heart rate check in ${formatClock(Math.max(0, nextCheck - elapsed))}`
-                    : 'No more checks — finish strong.'}
-                </ThemedText>
-              </>
+            {fingerPrompt(
+              'Finger on the camera.',
+              'Quick calibration reading — the run starts the moment we lock on.'
             )}
           </View>
-        ) : (
+        )}
+
+        {(phase === 'running' || phase === 'check') && (
+          <View style={styles.body}>
+            <View style={styles.heroStat}>
+              <ThemedText style={styles.clock}>{formatClock(elapsed)}</ThemedText>
+              <ThemedText type="smallBold" themeColor="textSecondary" style={styles.caps}>
+                Time
+              </ThemedText>
+            </View>
+
+            <View style={styles.statGrid}>
+              <View style={styles.stat}>
+                <ThemedText style={styles.statValue}>{formatMiles(distance)}</ThemedText>
+                <ThemedText type="smallBold" themeColor="textSecondary" style={styles.caps}>
+                  Miles
+                </ThemedText>
+              </View>
+              <View style={styles.stat}>
+                <ThemedText style={styles.statValue}>{formatPace(distance, elapsed)}</ThemedText>
+                <ThemedText type="smallBold" themeColor="textSecondary" style={styles.caps}>
+                  /Mile
+                </ThemedText>
+              </View>
+              <View style={styles.stat}>
+                <ThemedText style={[styles.statValue, lastHr ? { color: theme.heart } : null]}>
+                  {lastHr ?? '—'}
+                </ThemedText>
+                <ThemedText type="smallBold" themeColor="textSecondary" style={styles.caps}>
+                  BPM
+                </ThemedText>
+              </View>
+            </View>
+
+            {phase === 'check' ? (
+              fingerPrompt('Finger on the camera.', 'Quick heart rate check — keep moving.')
+            ) : (
+              <ThemedText type="small" themeColor="textSecondary" style={styles.centerText}>
+                {nextCheck !== undefined
+                  ? `Next heart rate check in ${formatClock(Math.max(0, nextCheck - elapsed))}`
+                  : 'No more checks — finish strong.'}
+              </ThemedText>
+            )}
+          </View>
+        )}
+
+        {phase === 'done' && (
           <View style={styles.body}>
             <ThemedText type="subtitle" style={styles.centerText}>
               Nice run.
             </ThemedText>
             <Card style={styles.summaryCard}>
-              <View style={styles.statRow}>
+              <View style={styles.statGrid}>
                 <View style={styles.stat}>
                   <ThemedText style={styles.statValue}>{formatClock(elapsed)}</ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">Time</ThemedText>
                 </View>
+                <View style={styles.stat}>
+                  <ThemedText style={styles.statValue}>{formatMiles(distance)}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">Miles</ThemedText>
+                </View>
+                <View style={styles.stat}>
+                  <ThemedText style={styles.statValue}>{formatPace(distance, elapsed)}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">/Mile</ThemedText>
+                </View>
+              </View>
+              <View style={styles.statGrid}>
                 <View style={styles.stat}>
                   <ThemedText style={styles.statValue}>{avgHr || '—'}</ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">Avg bpm</ThemedText>
@@ -326,13 +436,17 @@ export default function RunSessionScreen() {
                   <ThemedText style={styles.statValue}>{maxHr || '—'}</ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">Max bpm</ThemedText>
                 </View>
+                <View style={styles.stat}>
+                  <ThemedText style={styles.statValue}>{captured}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">HR checks</ThemedText>
+                </View>
               </View>
               {samples.length >= 2 && (
                 <Sparkline values={samples.map((s) => s.hr)} color={theme.heart} height={54} />
               )}
               <ThemedText type="small" themeColor="textSecondary">
-                {captured} of {checkpoints.length} heart rate checks captured. Save it, then upload
-                to Strava from the Run tab.
+                Save it, then upload to Strava from the Run tab — distance, route and heart rate
+                all come along.
               </ThemedText>
             </Card>
             <PressScale onPress={saveRun} style={[styles.primaryButton, { backgroundColor: theme.accent }]}>
@@ -376,17 +490,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.four,
-    paddingBottom: Spacing.six,
+    paddingBottom: Spacing.five,
   },
   centerText: {
     textAlign: 'center',
   },
+  heroStat: {
+    alignItems: 'center',
+    gap: 2,
+  },
   clock: {
-    fontSize: 72,
-    lineHeight: 78,
+    fontSize: 84,
+    lineHeight: 92,
     fontWeight: '800',
     fontFamily: Fonts.rounded,
     letterSpacing: -2,
+  },
+  statGrid: {
+    flexDirection: 'row',
+    alignSelf: 'stretch',
+    justifyContent: 'space-around',
+    paddingVertical: Spacing.two,
+  },
+  stat: {
+    alignItems: 'center',
+    gap: 2,
+    minWidth: 90,
+  },
+  statValue: {
+    fontSize: 34,
+    lineHeight: 40,
+    fontWeight: '800',
+    fontFamily: Fonts.rounded,
+    letterSpacing: -1,
   },
   cameraDot: {
     width: 64,
@@ -398,35 +534,8 @@ const styles = StyleSheet.create({
   camera: {
     flex: 1,
   },
-  hrPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingVertical: Spacing.two + 2,
-    paddingHorizontal: Spacing.four,
-    borderRadius: Radius.pill,
-  },
-  hrValue: {
-    fontSize: 24,
-    fontWeight: '800',
-    fontFamily: Fonts.rounded,
-  },
   summaryCard: {
     alignSelf: 'stretch',
-  },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: Spacing.two,
-  },
-  stat: {
-    alignItems: 'center',
-    gap: 2,
-  },
-  statValue: {
-    fontSize: 26,
-    fontWeight: '800',
-    fontFamily: Fonts.rounded,
   },
   primaryButton: {
     paddingVertical: Spacing.three,
