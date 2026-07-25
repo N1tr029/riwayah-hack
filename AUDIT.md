@@ -1,5 +1,19 @@
 # Brief — feature & UI audit
 
+> **2026-07-25 late-day re-audit.** Added since the morning audit: Spectrum redesign
+> (teammate), Strava-style guided runs (calibration → GPS miles/pace/splits → pause/resume
+> → TCX with route + HR), Apple Health export, front-camera visual check-in chained into
+> the morning flow, 34 tests. New findings and fixes:
+>
+> | Finding | Status |
+> |---|---|
+> | Installed dev build crashed with "Cannot find native module ExpoLocation" (binary older than JS) | ✅ Fixed — expo-location/task-manager now lazy-load and degrade to simulated GPS; rebuild still required for real GPS |
+> | Strava OAuth redirect host didn't match a settable callback domain | ✅ Fixed — `brief://localhost/strava` + documented "localhost" callback domain in .env.example |
+> | Morning flow ended at the finger scan | ✅ Fixed — scan → visual check-in (skippable) → brief |
+> | Split pace unstable in the first ~100 m of a split | Known — shows "-:--" until enough distance accumulates (by design) |
+> | Strava upload needs user-created API credentials | Open — 2-minute user step, see .env.example |
+> | Background GPS + lock-screen check reminders unverifiable in Expo Go | Open — verify on the dev build during a real outdoor run |
+
 Audited 2026-07-25 against the product spec, then against ui-craft's production-quality bar
 ("would a designer retouch this?"). Verified by full click-through on web (light + dark) and
 on-device in Expo Go.

@@ -17,6 +17,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { isFingerFrame } from '@/lib/finger';
 import { dateKey } from '@/lib/format';
 import {
+  METERS_PER_MILE,
   drainPoints,
   formatMiles,
   formatPace,
@@ -39,6 +40,7 @@ import {
 } from '@/lib/workout';
 
 const CHECK_WINDOW_SEC = 45;
+const STRAVA_ORANGE = '#FC4C02';
 
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
@@ -80,10 +82,64 @@ function cancelReminders(): void {
   Notifications.cancelAllScheduledNotificationsAsync().catch(() => {});
 }
 
+/** Strava-style HH:MM:SS. */
 function formatClock(sec: number): string {
-  const m = Math.floor(sec / 60);
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
   const s = Math.floor(sec % 60);
-  return `${m}:${`${s}`.padStart(2, '0')}`;
+  return `${`${h}`.padStart(2, '0')}:${`${m}`.padStart(2, '0')}:${`${s}`.padStart(2, '0')}`;
+}
+
+/** Mile splits bar row, Strava-style: past splits gray, current blue + orange underline. */
+function SplitsBars({
+  splitPaces,
+  currentPace,
+  theme,
+}: {
+  splitPaces: number[]; // sec per mile for completed splits
+  currentPace: string;
+  theme: ReturnType<typeof useTheme>;
+}) {
+  const slots = Math.max(3, splitPaces.length + 1);
+  const shown = [...splitPaces.map((p) => ({ pace: p, current: false })), { pace: null, current: true }];
+  while (shown.length < slots) shown.push({ pace: null, current: false });
+  const fastest = Math.min(...splitPaces, 8 * 60);
+
+  return (
+    <View style={styles.splitsWrap}>
+      <View style={styles.splitsRow}>
+        {shown.slice(-4).map((s, i) => {
+          const h = s.pace ? Math.max(28, Math.min(64, (fastest / s.pace) * 64)) : s.current ? 56 : 24;
+          return (
+            <View key={i} style={styles.splitCol}>
+              {s.current && (
+                <ThemedText type="small" themeColor="textSecondary" style={styles.splitPaceLabel}>
+                  {currentPace}
+                </ThemedText>
+              )}
+              <View
+                style={[
+                  styles.splitBar,
+                  {
+                    height: h,
+                    backgroundColor: s.current
+                      ? theme.accent
+                      : s.pace
+                        ? theme.backgroundSelected
+                        : theme.backgroundElement,
+                  },
+                ]}
+              />
+              {s.current && <View style={[styles.splitUnderline, { backgroundColor: STRAVA_ORANGE }]} />}
+            </View>
+          );
+        })}
+      </View>
+      <ThemedText type="small" themeColor="textSecondary">
+        Splits (mi)
+      </ThemedText>
+    </View>
+  );
 }
 
 type Phase = 'calibrate' | 'running' | 'check' | 'done';
@@ -100,11 +156,11 @@ export default function RunSessionScreen() {
 
   const isWeb = Platform.OS === 'web';
   const checkpoints = useRef(checkpointsFor(type, plannedMin)).current;
-  const startRef = useRef<number | null>(null);
   const seedRef = useRef((Date.now() % 1e9) | 0);
   const cameraRef = useRef<CameraView>(null);
 
   const [phase, setPhase] = useState<Phase>('calibrate');
+  const [paused, setPaused] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [samples, setSamples] = useState<WorkoutSample[]>([]);
   const [distance, setDistance] = useState(0);
@@ -112,14 +168,18 @@ export default function RunSessionScreen() {
   const [checkStartedAt, setCheckStartedAt] = useState(0);
   const nextCheckIdx = useRef(0);
   const savedRef = useRef(false);
+  const startedAtRef = useRef<number>(Date.now());
+  const segStartRef = useRef<number | null>(null);
+  const accumRef = useRef(0);
+  const pausedRef = useRef(false);
   const lastPointRef = useRef<GeoPoint | null>(null);
   const distanceRef = useRef(0);
   const routeRef = useRef<RoutePoint[]>([]);
+  const splitsRef = useRef<number[]>([]); // elapsed sec at each completed mile
   const stopTrackingRef = useRef<() => void>(() => {});
 
   const useCam = !isWeb && permission?.granted === true;
 
-  // Keep the screen on for the whole run (native only — web denies wake locks).
   useEffect(() => {
     if (isWeb) return;
     activateKeepAwakeAsync('run').catch(() => {});
@@ -137,10 +197,10 @@ export default function RunSessionScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const elapsedNow = useCallback(
-    () => (startRef.current === null ? 0 : (Date.now() - startRef.current) / 1000),
-    []
-  );
+  const elapsedNow = useCallback(() => {
+    if (segStartRef.current === null) return accumRef.current;
+    return accumRef.current + (pausedRef.current ? 0 : (Date.now() - segStartRef.current) / 1000);
+  }, []);
 
   const captureSample = useCallback(
     (captured: boolean) => {
@@ -153,9 +213,10 @@ export default function RunSessionScreen() {
     [type, elapsedNow]
   );
 
-  /** Calibration success: stamp t=0, start GPS + reminders, go. */
+  /** Calibration success: start the clock, GPS and reminders. */
   const beginRun = useCallback(async () => {
-    startRef.current = Date.now();
+    startedAtRef.current = Date.now();
+    segStartRef.current = Date.now();
     const at0 = runHeartRate(type, 0, seedRef.current);
     setSamples([{ atSec: 0, hr: at0, captured: true }]);
     success();
@@ -166,34 +227,56 @@ export default function RunSessionScreen() {
     setTrackingMode(mode);
   }, [type, checkpoints]);
 
-  // Clock + distance. Fires checkpoints, ends at planned duration.
+  const pauseRun = useCallback(() => {
+    if (pausedRef.current || segStartRef.current === null) return;
+    accumRef.current += (Date.now() - segStartRef.current) / 1000;
+    pausedRef.current = true;
+    setPaused(true);
+    tapLight();
+  }, []);
+
+  const resumeRun = useCallback(() => {
+    segStartRef.current = Date.now();
+    pausedRef.current = false;
+    lastPointRef.current = null; // don't count distance travelled while paused
+    setPaused(false);
+    tapLight();
+  }, []);
+
+  // Clock + distance + splits. Fires checkpoints, ends at planned duration.
   useEffect(() => {
     if (phase === 'done' || phase === 'calibrate') return;
     const timer = setInterval(() => {
       const e = elapsedNow();
       setElapsed(e);
 
-      // Distance: GPS points when we have them, simulated pace otherwise.
       const pts = drainPoints();
-      if (pts.length > 0) {
-        for (const p of pts) {
-          if (lastPointRef.current) {
-            const d = haversineMeters(lastPointRef.current, p);
-            if (d > 0.5 && d < 100) distanceRef.current += d;
+      if (!pausedRef.current) {
+        if (pts.length > 0) {
+          for (const p of pts) {
+            if (lastPointRef.current) {
+              const d = haversineMeters(lastPointRef.current, p);
+              if (d > 0.5 && d < 100) distanceRef.current += d;
+            }
+            lastPointRef.current = p;
+            const at = Math.round(e);
+            const lastRoute = routeRef.current[routeRef.current.length - 1];
+            if (!lastRoute || at - lastRoute.atSec >= 3) {
+              routeRef.current.push({ lat: p.lat, lon: p.lon, atSec: at });
+            }
           }
-          lastPointRef.current = p;
-          const at = Math.round(e);
-          const lastRoute = routeRef.current[routeRef.current.length - 1];
-          if (!lastRoute || at - lastRoute.atSec >= 3) {
-            routeRef.current.push({ lat: p.lat, lon: p.lon, atSec: at });
-          }
+        } else if (trackingMode === 'simulated') {
+          distanceRef.current += 0.5 * simulatedSpeed(type);
         }
-      } else if (trackingMode === 'simulated') {
-        distanceRef.current = e * simulatedSpeed(type);
-      }
-      setDistance(distanceRef.current);
+        setDistance(distanceRef.current);
 
-      if (phase === 'running') {
+        // Mile split boundary
+        if (distanceRef.current >= (splitsRef.current.length + 1) * METERS_PER_MILE) {
+          splitsRef.current.push(e);
+        }
+      }
+
+      if (phase === 'running' && !pausedRef.current) {
         const next = checkpoints[nextCheckIdx.current];
         if (next !== undefined && e >= next) {
           nextCheckIdx.current += 1;
@@ -270,13 +353,18 @@ export default function RunSessionScreen() {
   const finishRun = useCallback(() => {
     cancelReminders();
     stopTrackingRef.current();
+    if (!pausedRef.current && segStartRef.current !== null) {
+      accumRef.current += (Date.now() - segStartRef.current) / 1000;
+      pausedRef.current = true;
+    }
+    setElapsed(accumRef.current);
     setPhase('done');
   }, []);
 
   const saveRun = useCallback(() => {
     if (savedRef.current) return;
     savedRef.current = true;
-    const durationSec = Math.round(elapsed);
+    const durationSec = Math.round(accumRef.current);
     const { avgHr, maxHr } = summarize(samples);
     const today = dateKey(new Date());
     addWorkout({
@@ -284,7 +372,7 @@ export default function RunSessionScreen() {
       date: today,
       type,
       plannedMin,
-      startedAt: new Date(startRef.current ?? Date.now()).toISOString(),
+      startedAt: new Date(startedAtRef.current).toISOString(),
       durationSec,
       samples,
       avgHr,
@@ -295,17 +383,27 @@ export default function RunSessionScreen() {
     if (byDate(today)) updateDay(today, { workout: 'run' });
     tapLight();
     router.dismissTo('/(tabs)/run');
-  }, [elapsed, samples, type, plannedMin, addWorkout, byDate, updateDay]);
+  }, [samples, type, plannedMin, addWorkout, byDate, updateDay]);
 
   const captured = samples.filter((s) => s.captured).length;
   const nextCheck = checkpoints[nextCheckIdx.current];
   const { avgHr, maxHr } = summarize(samples);
   const lastHr = samples.length > 0 ? samples[samples.length - 1].hr : null;
 
+  // Current split pace: time and distance since the last completed mile.
+  const splitStartSec = splitsRef.current.length
+    ? splitsRef.current[splitsRef.current.length - 1]
+    : 0;
+  const splitDistance = distance - splitsRef.current.length * METERS_PER_MILE;
+  const currentSplitPace = formatPace(splitDistance, elapsed - splitStartSec);
+  const completedSplitPaces = splitsRef.current.map((s, i) =>
+    i === 0 ? s : s - splitsRef.current[i - 1]
+  );
+
   const fingerPrompt = (headline: string, caption: string) => (
     <>
       {useCam && (
-        <View style={[styles.cameraDot, { borderColor: theme.heart }]}>
+        <View style={[styles.cameraDot, { borderColor: theme.accent }]}>
           <CameraView
             ref={cameraRef}
             style={styles.camera}
@@ -318,7 +416,7 @@ export default function RunSessionScreen() {
         </View>
       )}
       <View style={{ alignSelf: 'stretch' }}>
-        <Waveform color={theme.heart} height={70} />
+        <Waveform color={theme.accent} height={64} />
       </View>
       <ThemedText type="subtitle" style={styles.centerText}>
         {headline}
@@ -332,78 +430,87 @@ export default function RunSessionScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <SafeAreaView style={styles.safe}>
-        <View style={styles.topRow}>
-          <View>
-            <ThemedText type="smallBold" themeColor="textSecondary" style={styles.caps}>
-              {runName(type)}
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              {plannedMin} min planned · {captured}/{checkpoints.length + 1} checks
-              {trackingMode === 'simulated' ? ' · GPS simulated' : ''}
-            </ThemedText>
-          </View>
-          {phase !== 'done' && phase !== 'calibrate' && (
-            <PressScale onPress={finishRun} accessibilityRole="button">
-              <ThemedText style={{ color: theme.low, fontWeight: '700' }}>End Run</ThemedText>
-            </PressScale>
-          )}
-          {phase === 'calibrate' && (
-            <PressScale onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Cancel run">
-              <Ionicons name="close" size={24} color={theme.textSecondary} />
-            </PressScale>
-          )}
-        </View>
-
         {phase === 'calibrate' && (
-          <View style={styles.body}>
-            {fingerPrompt(
-              'Finger on the camera.',
-              'Quick calibration reading — the run starts the moment we lock on.'
-            )}
-          </View>
+          <>
+            <View style={styles.topRow}>
+              <ThemedText type="smallBold" themeColor="textSecondary" style={styles.caps}>
+                {runName(type)} · {plannedMin} min
+              </ThemedText>
+              <PressScale onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Cancel run">
+                <Ionicons name="close" size={24} color={theme.textSecondary} />
+              </PressScale>
+            </View>
+            <View style={styles.body}>
+              {fingerPrompt(
+                'Finger on the camera.',
+                'Quick calibration reading — the run starts the moment we lock on.'
+              )}
+            </View>
+          </>
         )}
 
         {(phase === 'running' || phase === 'check') && (
-          <View style={styles.body}>
-            <View style={styles.heroStat}>
-              <ThemedText style={styles.clock}>{formatClock(elapsed)}</ThemedText>
-              <ThemedText type="smallBold" themeColor="textSecondary" style={styles.caps}>
-                Time
-              </ThemedText>
-            </View>
-
-            <View style={styles.statGrid}>
-              <View style={styles.stat}>
-                <ThemedText style={styles.statValue}>{formatMiles(distance)}</ThemedText>
-                <ThemedText type="smallBold" themeColor="textSecondary" style={styles.caps}>
-                  Miles
-                </ThemedText>
-              </View>
-              <View style={styles.stat}>
-                <ThemedText style={styles.statValue}>{formatPace(distance, elapsed)}</ThemedText>
-                <ThemedText type="smallBold" themeColor="textSecondary" style={styles.caps}>
-                  /Mile
-                </ThemedText>
-              </View>
-              <View style={styles.stat}>
-                <ThemedText style={[styles.statValue, lastHr ? { color: theme.heart } : null]}>
-                  {lastHr ?? '—'}
-                </ThemedText>
-                <ThemedText type="smallBold" themeColor="textSecondary" style={styles.caps}>
-                  BPM
-                </ThemedText>
-              </View>
-            </View>
+          <View style={styles.stravaLayout}>
+            <ThemedText style={styles.clock}>{formatClock(elapsed)}</ThemedText>
 
             {phase === 'check' ? (
-              fingerPrompt('Finger on the camera.', 'Quick heart rate check — keep moving.')
+              <View style={styles.checkBlock}>{fingerPrompt('Finger on the camera.', 'Quick heart rate check — keep moving.')}</View>
             ) : (
-              <ThemedText type="small" themeColor="textSecondary" style={styles.centerText}>
-                {nextCheck !== undefined
-                  ? `Next heart rate check in ${formatClock(Math.max(0, nextCheck - elapsed))}`
-                  : 'No more checks — finish strong.'}
-              </ThemedText>
+              <>
+                <View style={styles.bigStat}>
+                  <ThemedText style={styles.bigStatValue}>{currentSplitPace}</ThemedText>
+                  <ThemedText themeColor="textSecondary" style={styles.bigStatLabel}>
+                    Split avg. pace (/mi)
+                  </ThemedText>
+                </View>
+
+                <View style={styles.bigStat}>
+                  <ThemedText style={styles.bigStatValue}>{formatMiles(distance)}</ThemedText>
+                  <ThemedText themeColor="textSecondary" style={styles.bigStatLabel}>
+                    Distance (mi)
+                  </ThemedText>
+                </View>
+
+                <View style={styles.hrRow}>
+                  <Ionicons name="heart" size={14} color={theme.heart} />
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {lastHr ? `${lastHr} bpm` : 'calibrating'} · {captured}/{checkpoints.length + 1} checks
+                    {nextCheck !== undefined && !paused
+                      ? ` · next in ${Math.max(0, Math.ceil((nextCheck - elapsed) / 60))}m`
+                      : ''}
+                    {trackingMode === 'simulated' ? ' · GPS simulated' : ''}
+                  </ThemedText>
+                </View>
+
+                <SplitsBars splitPaces={completedSplitPaces} currentPace={currentSplitPace} theme={theme} />
+              </>
             )}
+
+            <View style={styles.controls}>
+              {paused ? (
+                <View style={styles.pausedRow}>
+                  <PressScale
+                    onPress={resumeRun}
+                    style={[styles.bigButton, { backgroundColor: STRAVA_ORANGE, flex: 1 }]}>
+                    <Ionicons name="play" size={20} color="#FFF" />
+                    <ThemedText style={styles.bigButtonLabel}>Resume</ThemedText>
+                  </PressScale>
+                  <PressScale
+                    onPress={finishRun}
+                    style={[styles.bigButton, { backgroundColor: theme.backgroundSelected, flex: 1 }]}>
+                    <Ionicons name="flag" size={18} color={theme.text} />
+                    <ThemedText style={[styles.bigButtonLabel, { color: theme.text }]}>Finish</ThemedText>
+                  </PressScale>
+                </View>
+              ) : (
+                <PressScale
+                  onPress={pauseRun}
+                  style={[styles.bigButton, { backgroundColor: STRAVA_ORANGE }]}>
+                  <Ionicons name="pause" size={20} color="#FFF" />
+                  <ThemedText style={styles.bigButtonLabel}>Pause</ThemedText>
+                </PressScale>
+              )}
+            </View>
           </View>
         )}
 
@@ -449,8 +556,8 @@ export default function RunSessionScreen() {
                 all come along.
               </ThemedText>
             </Card>
-            <PressScale onPress={saveRun} style={[styles.primaryButton, { backgroundColor: theme.accent }]}>
-              <ThemedText style={styles.primaryLabel}>Save Run</ThemedText>
+            <PressScale onPress={saveRun} style={[styles.bigButton, { backgroundColor: STRAVA_ORANGE, minWidth: 230 }]}>
+              <ThemedText style={styles.bigButtonLabel}>Save Run</ThemedText>
             </PressScale>
             <PressScale onPress={() => { cancelReminders(); router.dismissTo('/(tabs)/run'); }}>
               <ThemedText type="small" themeColor="textSecondary">
@@ -477,7 +584,7 @@ const styles = StyleSheet.create({
   },
   topRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
   },
   caps: {
@@ -495,34 +602,91 @@ const styles = StyleSheet.create({
   centerText: {
     textAlign: 'center',
   },
-  heroStat: {
+  stravaLayout: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.three,
+  },
+  clock: {
+    fontSize: 64,
+    lineHeight: 72,
+    fontWeight: '800',
+    fontFamily: Fonts.rounded,
+    letterSpacing: -1,
+  },
+  bigStat: {
     alignItems: 'center',
     gap: 2,
   },
-  clock: {
-    fontSize: 84,
-    lineHeight: 92,
+  bigStatValue: {
+    fontSize: 72,
+    lineHeight: 80,
     fontWeight: '800',
     fontFamily: Fonts.rounded,
     letterSpacing: -2,
   },
-  statGrid: {
+  bigStatLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  hrRow: {
     flexDirection: 'row',
-    alignSelf: 'stretch',
-    justifyContent: 'space-around',
-    paddingVertical: Spacing.two,
-  },
-  stat: {
     alignItems: 'center',
-    gap: 2,
-    minWidth: 90,
+    gap: Spacing.one + 2,
   },
-  statValue: {
-    fontSize: 34,
-    lineHeight: 40,
-    fontWeight: '800',
-    fontFamily: Fonts.rounded,
-    letterSpacing: -1,
+  checkBlock: {
+    alignItems: 'center',
+    gap: Spacing.three,
+    alignSelf: 'stretch',
+  },
+  splitsWrap: {
+    alignItems: 'center',
+    gap: Spacing.one + 2,
+  },
+  splitsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: Spacing.two,
+  },
+  splitCol: {
+    alignItems: 'center',
+    width: 84,
+    justifyContent: 'flex-end',
+  },
+  splitPaceLabel: {
+    marginBottom: 2,
+  },
+  splitBar: {
+    alignSelf: 'stretch',
+    borderRadius: 8,
+  },
+  splitUnderline: {
+    alignSelf: 'stretch',
+    height: 5,
+    borderRadius: 3,
+    marginTop: 3,
+  },
+  controls: {
+    alignSelf: 'stretch',
+    paddingTop: Spacing.two,
+  },
+  pausedRow: {
+    flexDirection: 'row',
+    gap: Spacing.two + 2,
+  },
+  bigButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+    paddingVertical: Spacing.three + 2,
+    borderRadius: Radius.pill,
+  },
+  bigButtonLabel: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 18,
   },
   cameraDot: {
     width: 64,
@@ -537,16 +701,22 @@ const styles = StyleSheet.create({
   summaryCard: {
     alignSelf: 'stretch',
   },
-  primaryButton: {
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.five,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    minWidth: 230,
+  statGrid: {
+    flexDirection: 'row',
+    alignSelf: 'stretch',
+    justifyContent: 'space-around',
+    paddingVertical: Spacing.two,
   },
-  primaryLabel: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 17,
+  stat: {
+    alignItems: 'center',
+    gap: 2,
+    minWidth: 90,
+  },
+  statValue: {
+    fontSize: 30,
+    lineHeight: 36,
+    fontWeight: '800',
+    fontFamily: Fonts.rounded,
+    letterSpacing: -1,
   },
 });

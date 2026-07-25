@@ -96,7 +96,8 @@ export default function ScanScreen() {
       setTimeout(() => {
         clearTimeout(line2);
         success();
-        router.replace('/brief');
+        // Morning flow: finger scan → visual check-in → brief.
+        router.replace('/face-scan?next=brief');
       }, 2100);
     },
     [records, saveRecord]

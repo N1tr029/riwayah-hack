@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Accelerometer } from 'expo-sensors';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
@@ -75,8 +75,14 @@ function TrackingDot({ color, width }: { color: string; width: number }) {
 
 export default function FaceScanScreen() {
   const theme = useTheme();
-  const { records, faceScans, addFaceScan, today } = useBrief();
+  const { faceScans, addFaceScan, today } = useBrief();
+  const { next } = useLocalSearchParams<{ next?: string }>();
   const [permission, requestPermission] = useCameraPermissions();
+
+  const leave = () => {
+    if (next === 'brief') router.replace('/brief');
+    else router.back();
+  };
 
   const isWeb = Platform.OS === 'web';
   const [phase, setPhase] = useState<Phase>('intro');
@@ -198,7 +204,7 @@ export default function FaceScanScreen() {
       <SafeAreaView style={styles.safe}>
         {phase !== 'processing' && (
           <PressScale
-            onPress={() => router.back()}
+            onPress={leave}
             style={styles.close}
             accessibilityRole="button"
             accessibilityLabel="Close visual check-in">
@@ -227,6 +233,13 @@ export default function FaceScanScreen() {
             <PressScale onPress={start} style={[styles.primaryButton, { backgroundColor: theme.accent }]}>
               <ThemedText style={styles.primaryLabel}>Start check-in</ThemedText>
             </PressScale>
+            {next === 'brief' && (
+              <PressScale onPress={leave}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Skip for now
+                </ThemedText>
+              </PressScale>
+            )}
           </View>
         )}
 
@@ -285,9 +298,11 @@ export default function FaceScanScreen() {
               </Card>
             ))}
             <PressScale
-              onPress={() => router.back()}
+              onPress={leave}
               style={[styles.primaryButton, { backgroundColor: theme.accent }]}>
-              <ThemedText style={styles.primaryLabel}>Done</ThemedText>
+              <ThemedText style={styles.primaryLabel}>
+                {next === 'brief' ? 'See your brief' : 'Done'}
+              </ThemedText>
             </PressScale>
           </View>
         )}

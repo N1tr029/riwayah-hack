@@ -52,7 +52,9 @@ export default function RunScreen() {
   const [stravaConnected, setStravaConnected] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const redirectUri = AuthSession.makeRedirectUri({ scheme: 'brief', path: 'strava' });
+  // Strava validates redirect hosts against the app's "Authorization Callback
+  // Domain" — set that field to `localhost` on strava.com/settings/api.
+  const redirectUri = AuthSession.makeRedirectUri({ scheme: 'brief', path: 'localhost/strava' });
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
       clientId: STRAVA_CLIENT_ID,
