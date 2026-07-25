@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -19,7 +19,13 @@ export default function HomeScreen() {
   const theme = useTheme();
   const { ready, records, today } = useBrief();
 
-  if (!ready) return <View style={{ flex: 1, backgroundColor: theme.background }} />;
+  if (!ready) {
+    return (
+      <View style={[styles.loading, { backgroundColor: theme.background }]}>
+        <ActivityIndicator color={theme.accent} />
+      </View>
+    );
+  }
 
   const last7 = records.slice(-7);
   const avg7 = last7.length
@@ -40,7 +46,11 @@ export default function HomeScreen() {
                 {friendlyDate(todayKey())}
               </ThemedText>
             </View>
-            <PressScale onPress={() => router.push('/settings')} style={styles.gear}>
+            <PressScale
+              onPress={() => router.push('/settings')}
+              style={styles.gear}
+              accessibilityRole="button"
+              accessibilityLabel="Settings">
               <Ionicons name="settings-outline" size={22} color={theme.textSecondary} />
             </PressScale>
           </View>
@@ -125,6 +135,11 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  loading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   safe: {
     flex: 1,
     alignSelf: 'center',

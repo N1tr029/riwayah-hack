@@ -1,7 +1,7 @@
-import { useState } from 'react';
 import { View } from 'react-native';
 import Svg, { Path, Text as SvgText } from 'react-native-svg';
 
+import { useMeasuredWidth } from '@/hooks/use-measured-width';
 import { useTheme } from '@/hooks/use-theme';
 
 interface Bar {
@@ -35,7 +35,7 @@ function roundedTopBar(x: number, yTop: number, w: number, yBase: number, r: num
  */
 export function WeekBars({ bars, height = 130 }: Props) {
   const theme = useTheme();
-  const [width, setWidth] = useState(0);
+  const { ref, width, onLayout } = useMeasuredWidth();
 
   const labelBand = 20;
   const valueBand = 18;
@@ -43,7 +43,7 @@ export function WeekBars({ bars, height = 130 }: Props) {
   const yBase = valueBand + plotH;
 
   return (
-    <View style={{ height }} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+    <View ref={ref} style={{ height }} onLayout={onLayout}>
       {width > 0 && (
         <Svg width={width} height={height}>
           {bars.map((b, i) => {

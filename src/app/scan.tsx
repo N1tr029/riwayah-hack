@@ -139,7 +139,11 @@ export default function ScanScreen() {
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <SafeAreaView style={styles.safe}>
         {phase !== 'processing' && (
-          <PressScale onPress={() => router.back()} style={styles.close}>
+          <PressScale
+            onPress={() => router.back()}
+            style={styles.close}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel scan">
             <Ionicons name="close" size={24} color={theme.textSecondary} />
           </PressScale>
         )}

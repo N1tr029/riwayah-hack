@@ -71,6 +71,7 @@ export default function SettingsScreen() {
                 value={settings.reminderEnabled}
                 onValueChange={(v) => setSettings({ reminderEnabled: v })}
                 trackColor={{ true: theme.accent }}
+                accessibilityLabel="Morning reminder"
               />
             </Row>
             {settings.reminderEnabled && (
@@ -101,6 +102,7 @@ export default function SettingsScreen() {
                 value={settings.haptics}
                 onValueChange={(v) => setSettings({ haptics: v })}
                 trackColor={{ true: theme.accent }}
+                accessibilityLabel="Haptics"
               />
             </Row>
             <Row label="Advanced metrics" hint="Show raw numbers in your briefing">
@@ -108,6 +110,7 @@ export default function SettingsScreen() {
                 value={settings.showAdvanced}
                 onValueChange={(v) => setSettings({ showAdvanced: v })}
                 trackColor={{ true: theme.accent }}
+                accessibilityLabel="Advanced metrics"
               />
             </Row>
           </Card>

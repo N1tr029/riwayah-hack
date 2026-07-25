@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { Card } from '@/components/ui/card';
@@ -21,6 +22,9 @@ const ENERGY_ICON = 'flash-outline' as const;
 const STRESS_ICON = 'water-outline' as const;
 const SLEEP_ICON = 'moon-outline' as const;
 
+/** Quiet, staggered entrance — short, ease-out, no bounce. */
+const enter = (step: number) => FadeInDown.duration(320).delay(step * 70);
+
 /** The heart of the app: one calm, readable briefing. */
 export function BriefView({ record, history, onViewDetails }: Props) {
   const theme = useTheme();
@@ -35,7 +39,7 @@ export function BriefView({ record, history, onViewDetails }: Props) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.hero}>
+      <Animated.View entering={enter(0)} style={styles.hero}>
         <ScoreRing score={record.recovery} />
         <ThemedText type="subtitle" style={styles.status}>
           {record.statusWord}
@@ -43,35 +47,41 @@ export function BriefView({ record, history, onViewDetails }: Props) {
         <ThemedText type="small" themeColor="textSecondary">
           {baselineLine(record.recovery, history, record.date)}
         </ThemedText>
-      </View>
+      </Animated.View>
 
-      <Card style={styles.metricsCard}>
-        <MetricRow icon={ENERGY_ICON} label="Energy" value={record.energy} tint={energyTint} />
-        <MetricRow icon={STRESS_ICON} label="Stress" value={record.stress} tint={stressTint} />
-        <MetricRow icon={SLEEP_ICON} label="Sleep" value={record.sleep} tint={sleepTint} />
-      </Card>
+      <Animated.View entering={enter(1)}>
+        <Card style={styles.metricsCard}>
+          <MetricRow icon={ENERGY_ICON} label="Energy" value={record.energy} tint={energyTint} />
+          <MetricRow icon={STRESS_ICON} label="Stress" value={record.stress} tint={stressTint} />
+          <MetricRow icon={SLEEP_ICON} label="Sleep" value={record.sleep} tint={sleepTint} />
+        </Card>
+      </Animated.View>
 
-      <Card>
-        <ThemedText type="smallBold" themeColor="textSecondary" style={styles.caps}>
-          Today’s recommendation
-        </ThemedText>
-        <ThemedText style={styles.recommendation}>{record.recommendation}</ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          {record.explanation}
-        </ThemedText>
-      </Card>
-
-      <Card style={{ backgroundColor: theme.accentSoft, borderColor: 'transparent' }}>
-        <View style={styles.missionHeader}>
-          <Ionicons name="navigate-outline" size={16} color={theme.accent} />
-          <ThemedText type="smallBold" style={[styles.caps, { color: theme.accent }]}>
-            Today’s mission
+      <Animated.View entering={enter(2)}>
+        <Card>
+          <ThemedText type="smallBold" themeColor="textSecondary" style={styles.caps}>
+            Today’s recommendation
           </ThemedText>
-        </View>
-        <ThemedText style={styles.recommendation}>{record.mission}</ThemedText>
-      </Card>
+          <ThemedText style={styles.recommendation}>{record.recommendation}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {record.explanation}
+          </ThemedText>
+        </Card>
+      </Animated.View>
 
-      <View style={styles.footerRow}>
+      <Animated.View entering={enter(3)}>
+        <Card style={{ backgroundColor: theme.accentSoft, borderColor: 'transparent' }}>
+          <View style={styles.missionHeader}>
+            <Ionicons name="navigate-outline" size={16} color={theme.accent} />
+            <ThemedText type="smallBold" style={[styles.caps, { color: theme.accent }]}>
+              Today’s mission
+            </ThemedText>
+          </View>
+          <ThemedText style={styles.recommendation}>{record.mission}</ThemedText>
+        </Card>
+      </Animated.View>
+
+      <Animated.View entering={enter(4)} style={styles.footerRow}>
         <View style={styles.confidence}>
           <View style={[styles.confidenceDot, { backgroundColor: record.confidence === 'weak' ? theme.clay : color }]} />
           <ThemedText type="small" themeColor="textSecondary">
@@ -86,7 +96,7 @@ export function BriefView({ record, history, onViewDetails }: Props) {
             <Ionicons name="chevron-forward" size={14} color={theme.accent} />
           </PressScale>
         )}
-      </View>
+      </Animated.View>
     </View>
   );
 }

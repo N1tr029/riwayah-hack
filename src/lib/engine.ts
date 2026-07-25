@@ -173,7 +173,9 @@ export function makeScanMetrics(history: DayRecord[], seed: number): DayMetrics 
   const bedtimeHour = rng() < 0.25 ? Math.round(range(rng, 24, 25.5) * 2) / 2 : Math.round(range(rng, 22, 23.5) * 2) / 2;
   const hrv = Math.round(anchorHrv + range(rng, -9, 10) + (sleepHours - 7) * 2);
   const rhr = Math.round(anchorRhr + range(rng, -2.5, 3) - (sleepHours - 7) * 0.8);
-  const hr = Math.round(rhr + range(rng, 4, 10));
+  // Awake sitting HR runs well above overnight resting — a daytime scan
+  // should read in the 70s for someone whose RHR is high-50s.
+  const hr = Math.round(rhr + range(rng, 12, 22));
   return { hr, rhr, hrv, sleepHours, bedtimeHour };
 }
 

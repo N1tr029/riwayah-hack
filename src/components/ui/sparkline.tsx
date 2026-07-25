@@ -1,6 +1,7 @@
-import { useState } from 'react';
 import { View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
+
+import { useMeasuredWidth } from '@/hooks/use-measured-width';
 
 interface Props {
   values: number[];
@@ -12,7 +13,7 @@ interface Props {
 
 /** Single-series trend line: 2px stroke, dot on the latest point, no chrome. */
 export function Sparkline({ values, height = 56, color, fill }: Props) {
-  const [width, setWidth] = useState(0);
+  const { ref, width, onLayout } = useMeasuredWidth();
 
   if (values.length < 2) return <View style={{ height }} />;
 
@@ -27,7 +28,7 @@ export function Sparkline({ values, height = 56, color, fill }: Props) {
   const area = `${line} L ${x(values.length - 1).toFixed(1)} ${height} L ${x(0).toFixed(1)} ${height} Z`;
 
   return (
-    <View style={{ height }} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+    <View ref={ref} style={{ height }} onLayout={onLayout}>
       {width > 0 && (
         <Svg width={width} height={height}>
           {fill && <Path d={area} fill={fill} />}
