@@ -56,6 +56,9 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "ios": {
+      "bundleIdentifier": "com.riwayah.brief"
     }
   }
 }

@@ -28,6 +28,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="run"
+        options={{
+          title: 'Run',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'walk' : 'walk-outline'} size={22} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="insights"
         options={{
           title: 'Insights',

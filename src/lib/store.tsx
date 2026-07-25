@@ -4,9 +4,11 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { buildSeedHistory } from '@/lib/seed';
 import { todayKey } from '@/lib/format';
 import { DEFAULT_SETTINGS, type AppSettings, type DayRecord } from '@/lib/types';
+import type { WorkoutSession } from '@/lib/workout';
 
 const RECORDS_KEY = 'brief.records.v1';
 const SETTINGS_KEY = 'brief.settings.v1';
+const WORKOUTS_KEY = 'brief.workouts.v1';
 
 interface BriefStore {
   ready: boolean;
@@ -17,6 +19,9 @@ interface BriefStore {
   byDate: (date: string) => DayRecord | undefined;
   saveRecord: (record: DayRecord) => void;
   updateDay: (date: string, patch: Partial<DayRecord>) => void;
+  workouts: WorkoutSession[];
+  addWorkout: (workout: WorkoutSession) => void;
+  updateWorkout: (id: string, patch: Partial<WorkoutSession>) => void;
   settings: AppSettings;
   setSettings: (patch: Partial<AppSettings>) => void;
   resetAll: () => void;
@@ -27,14 +32,16 @@ const Ctx = createContext<BriefStore | null>(null);
 export function BriefProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [records, setRecords] = useState<DayRecord[]>([]);
+  const [workouts, setWorkouts] = useState<WorkoutSession[]>([]);
   const [settings, setSettingsState] = useState<AppSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
     (async () => {
       try {
-        const [rawRecords, rawSettings] = await Promise.all([
+        const [rawRecords, rawSettings, rawWorkouts] = await Promise.all([
           AsyncStorage.getItem(RECORDS_KEY),
           AsyncStorage.getItem(SETTINGS_KEY),
+          AsyncStorage.getItem(WORKOUTS_KEY),
         ]);
         if (rawRecords) {
           setRecords(JSON.parse(rawRecords));
@@ -44,6 +51,7 @@ export function BriefProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.setItem(RECORDS_KEY, JSON.stringify(seeded));
         }
         if (rawSettings) setSettingsState({ ...DEFAULT_SETTINGS, ...JSON.parse(rawSettings) });
+        if (rawWorkouts) setWorkouts(JSON.parse(rawWorkouts));
       } catch {
         setRecords(buildSeedHistory());
       } finally {
@@ -78,6 +86,22 @@ export function BriefProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const addWorkout = useCallback((workout: WorkoutSession) => {
+    setWorkouts((prev) => {
+      const next = [...prev, workout];
+      AsyncStorage.setItem(WORKOUTS_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const updateWorkout = useCallback((id: string, patch: Partial<WorkoutSession>) => {
+    setWorkouts((prev) => {
+      const next = prev.map((w) => (w.id === id ? { ...w, ...patch } : w));
+      AsyncStorage.setItem(WORKOUTS_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
   const setSettings = useCallback((patch: Partial<AppSettings>) => {
     setSettingsState((prev) => {
       const next = { ...prev, ...patch };
@@ -102,11 +126,14 @@ export function BriefProvider({ children }: { children: React.ReactNode }) {
       byDate: (date) => records.find((r) => r.date === date),
       saveRecord,
       updateDay,
+      workouts,
+      addWorkout,
+      updateWorkout,
       settings,
       setSettings,
       resetAll,
     };
-  }, [ready, records, settings, saveRecord, updateDay, setSettings, resetAll]);
+  }, [ready, records, workouts, settings, saveRecord, updateDay, addWorkout, updateWorkout, setSettings, resetAll]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
