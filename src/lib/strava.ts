@@ -125,7 +125,7 @@ export async function uploadToStrava(session: WorkoutSession): Promise<boolean> 
   } as any);
   form.append('data_type', 'tcx');
   form.append('name', runName(session.type));
-  form.append('description', 'Recorded with Brief. Heart rate included from Apple Health when available.');
+  form.append('description', 'Heart rate captured with Brief fingertip scans.');
   form.append('activity_type', 'run');
 
   const res = await fetch('https://www.strava.com/api/v3/uploads', {

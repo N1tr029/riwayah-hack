@@ -34,12 +34,11 @@ function nextDayRecoveryByWorkout(records: DayRecord[]): Map<Workout, number[]> 
 
 export function findPatterns(records: DayRecord[]): PatternObservation[] {
   const found: PatternObservation[] = [];
-  if (records.length < 14) return found;
+  if (records.length < 7) return found;
 
-  // Activity comparison needs repeated examples of two different activities.
-  // It describes association only; it never tells the user a sport "suits" them.
+  // Workout comparison: needs 2+ samples of two different workouts.
   const byWorkout = nextDayRecoveryByWorkout(records);
-  const pairs = [...byWorkout.entries()].filter(([, v]) => v.length >= 4);
+  const pairs = [...byWorkout.entries()].filter(([, v]) => v.length >= 2);
   if (pairs.length >= 2) {
     pairs.sort((a, b) => avg(b[1]) - avg(a[1]));
     const [bestW, bestVals] = pairs[0];
@@ -47,9 +46,9 @@ export function findPatterns(records: DayRecord[]): PatternObservation[] {
     if (avg(bestVals) - avg(worstVals) >= 5) {
       found.push({
         id: 'workout',
-        icon: 'analytics-outline',
-        title: `Higher scores followed ${WORKOUT_NAMES[bestW]}`,
-        detail: `Across ${bestVals.length} logged sessions, next-morning scores averaged ${Math.round(avg(bestVals) - avg(worstVals))} points higher than after ${WORKOUT_NAMES[worstW]}. That is an association, not a cause.`,
+        icon: 'tennisball-outline',
+        title: `${WORKOUT_NAMES[bestW]} suits you`,
+        detail: `You consistently recover better after ${WORKOUT_NAMES[bestW]} than ${WORKOUT_NAMES[worstW]} — about ${Math.round(avg(bestVals) - avg(worstVals))} points higher the next morning.`,
       });
     }
   }
@@ -61,8 +60,8 @@ export function findPatterns(records: DayRecord[]): PatternObservation[] {
     found.push({
       id: 'bedtime',
       icon: 'moon-outline',
-      title: 'Earlier nights lined up with higher scores',
-      detail: `Recorded scores averaged ${Math.round(avg(early) - avg(late))} points higher after earlier bedtimes. Other factors may also be involved.`,
+      title: 'Midnight matters',
+      detail: `Your recovery drops when you sleep after midnight — roughly ${Math.round(avg(early) - avg(late))} points below your earlier nights.`,
     });
   }
 
@@ -75,7 +74,7 @@ export function findPatterns(records: DayRecord[]): PatternObservation[] {
     byDow.set(dow, list);
   }
   const dowAvgs = [...byDow.entries()]
-    .filter(([, v]) => v.length >= 4)
+    .filter(([, v]) => v.length >= 2)
     .map(([dow, v]) => ({ dow, mean: avg(v) }))
     .sort((a, b) => b.mean - a.mean);
   if (dowAvgs.length >= 4 && dowAvgs[0].mean - avg(records.map((r) => r.recovery)) >= 4) {
@@ -83,8 +82,8 @@ export function findPatterns(records: DayRecord[]): PatternObservation[] {
     found.push({
       id: 'weekday',
       icon: 'sunny-outline',
-      title: `${name}s have averaged higher`,
-      detail: `${name} has the highest average among weekdays with at least four recorded check-ins.`,
+      title: `${name}s are your strongest`,
+      detail: `${name} is consistently your highest recovery day of the week.`,
     });
   }
 
@@ -104,7 +103,7 @@ export function findPatterns(records: DayRecord[]): PatternObservation[] {
         id: 'trend',
         icon: 'leaf-outline',
         title: 'A softer week',
-        detail: 'Recorded readiness averaged a little lower this week. More data will show whether it is a trend.',
+        detail: 'Readiness has dipped a little this week — a couple of earlier nights would go a long way.',
       });
     }
   }

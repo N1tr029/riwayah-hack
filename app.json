@@ -57,7 +57,8 @@
       [
         "@kingstinct/react-native-healthkit",
         {
-          "NSHealthShareUsageDescription": "Brief reads your sleep, resting heart rate, heart rate variability, and heart rate so it can build briefings from your real Health data."
+          "NSHealthShareUsageDescription": "Brief shows your morning readiness alongside your existing health data.",
+          "NSHealthUpdateUsageDescription": "Brief writes your scan heart rate and overnight resting heart rate to Apple Health."
         }
       ]
     ],

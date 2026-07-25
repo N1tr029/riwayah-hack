@@ -17,30 +17,6 @@ export default function InsightsScreen() {
   const { ready, records } = useBrief();
 
   if (!ready) return <View style={{ flex: 1, backgroundColor: theme.background }} />;
-  if (records.length === 0) {
-    return (
-      <View style={{ flex: 1, backgroundColor: theme.background }}>
-        <SafeAreaView style={styles.safe} edges={['top']}>
-          <View style={styles.content}>
-            <View style={styles.header}>
-              <ThemedText type="subtitle">Insights</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                Patterns backed by your own recorded data.
-              </ThemedText>
-            </View>
-            <Card style={styles.emptyCard}>
-              <Ionicons name="analytics-outline" size={30} color={theme.textSecondary} />
-              <ThemedText style={{ fontWeight: '600' }}>No patterns yet</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.emptyText}>
-                Brief needs real check-ins before it can compare anything. It will not invent
-                activity recommendations.
-              </ThemedText>
-            </Card>
-          </View>
-        </SafeAreaView>
-      </View>
-    );
-  }
 
   const last7 = records.slice(-7);
   const prior7 = records.slice(-14, -7);
@@ -71,7 +47,7 @@ export default function InsightsScreen() {
           <View style={styles.header}>
             <ThemedText type="subtitle">Insights</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              Patterns backed by your own recorded data.
+              Patterns from your own baseline — never anyone else’s.
             </ThemedText>
           </View>
 
@@ -102,7 +78,7 @@ export default function InsightsScreen() {
           </Card>
 
           <ThemedText type="smallBold" themeColor="textSecondary" style={[styles.caps, styles.sectionTitle]}>
-            Patterns in your data
+            What we’ve noticed
           </ThemedText>
 
           {patterns.length === 0 ? (
@@ -191,13 +167,5 @@ const styles = StyleSheet.create({
   patternText: {
     flex: 1,
     gap: 2,
-  },
-  emptyCard: {
-    alignItems: 'center',
-    gap: Spacing.two,
-    marginTop: Spacing.four,
-  },
-  emptyText: {
-    textAlign: 'center',
   },
 });

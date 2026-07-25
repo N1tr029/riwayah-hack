@@ -9,7 +9,7 @@ import { PressScale } from '@/components/ui/press-scale';
 import { SpectrumBar } from '@/components/ui/spectrum-bar';
 import { Radius, Spacing, scoreColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { CONFIDENCE_LABEL, baselineLine } from '@/lib/engine';
+import { baselinesFrom, CONFIDENCE_LABEL, baselineLine, recoveryFactors } from '@/lib/engine';
 import type { DayRecord } from '@/lib/types';
 
 interface Props {
@@ -33,7 +33,13 @@ function StatTile({ label, value, color, fill }: { label: string; value: string;
       <ThemedText type="smallBold" style={[styles.tileLabel, { color: theme.textSecondary }]}>
         {label}
       </ThemedText>
-      <ThemedText style={[styles.tileValue, { color }]}>{value}</ThemedText>
+      <ThemedText
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.72}
+        style={[styles.tileValue, { color }]}>
+        {value}
+      </ThemedText>
       <View style={styles.segments}>
         {[0, 1, 2].map((i) => (
           <View key={i} style={[styles.segment, { backgroundColor: i < fill ? color : theme.track }]} />
@@ -51,6 +57,7 @@ export function BriefView({ record, history, onViewDetails }: Props) {
   const baseline = window.length
     ? Math.round(window.reduce((s, r) => s + r.recovery, 0) / window.length)
     : record.recovery;
+  const factors = recoveryFactors(record, baselinesFrom(history));
 
   return (
     <View style={styles.container}>
@@ -82,6 +89,46 @@ export function BriefView({ record, history, onViewDetails }: Props) {
 
       <Animated.View entering={enter(2)}>
         <Card>
+          <View style={styles.whyHeader}>
+            <Ionicons name="information-circle-outline" size={18} color={theme.accent} />
+            <ThemedText type="smallBold" style={{ color: theme.accent }}>
+              Why {record.recovery}?
+            </ThemedText>
+          </View>
+          <ThemedText type="small" themeColor="textSecondary">
+            Recovery starts at 74, then adjusts for four signals against your recent Brief
+            baseline. Pulse by itself does not set the score.
+          </ThemedText>
+          <View style={styles.factorList}>
+            {factors.map((factor) => (
+              <View key={factor.label} style={styles.factorRow}>
+                <View style={{ flex: 1 }}>
+                  <ThemedText type="smallBold">{factor.label}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {factor.comparison}
+                  </ThemedText>
+                </View>
+                <ThemedText
+                  type="smallBold"
+                  style={{ color: factor.points < 0 ? theme.warn : theme.good }}>
+                  {factor.points > 0 ? '+' : ''}
+                  {factor.points}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
+          <View style={[styles.prototypeNote, { backgroundColor: theme.backgroundElement }]}>
+            <ThemedText type="small" themeColor="textSecondary">
+              This write-only prototype does not read Apple Health. HRV, resting HR, sleep,
+              and bedtime are check-in estimates, so treat recovery as guidance—not a medical
+              measurement.
+            </ThemedText>
+          </View>
+        </Card>
+      </Animated.View>
+
+      <Animated.View entering={enter(3)}>
+        <Card>
           <ThemedText type="smallBold" themeColor="textSecondary" style={styles.caps}>
             Today’s recommendation
           </ThemedText>
@@ -92,7 +139,7 @@ export function BriefView({ record, history, onViewDetails }: Props) {
         </Card>
       </Animated.View>
 
-      <Animated.View entering={enter(3)}>
+      <Animated.View entering={enter(4)}>
         <Card style={{ backgroundColor: theme.accentSoft }}>
           <View style={styles.missionHeader}>
             <Ionicons name="navigate" size={15} color={theme.accent} />
@@ -104,7 +151,7 @@ export function BriefView({ record, history, onViewDetails }: Props) {
         </Card>
       </Animated.View>
 
-      <Animated.View entering={enter(4)} style={styles.footerRow}>
+      <Animated.View entering={enter(5)} style={styles.footerRow}>
         <View style={styles.confidence}>
           <View
             style={[
@@ -201,6 +248,25 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 25,
     fontWeight: '600',
+  },
+  whyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  factorList: {
+    gap: Spacing.two,
+    marginTop: Spacing.one,
+  },
+  factorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
+  prototypeNote: {
+    borderRadius: Radius.small,
+    padding: Spacing.two + 2,
+    marginTop: Spacing.one,
   },
   missionHeader: {
     flexDirection: 'row',

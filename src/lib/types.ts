@@ -16,8 +16,8 @@ export interface DayRecord {
   sleepHours: number;
   /** Hour the user went to bed; 24+ means after midnight */
   bedtimeHour: number;
-  /** Most recent Apple Health heart-rate sample, when one is available. */
-  hr: number | null;
+  /** Beats per minute measured during the scan */
+  hr: number;
   /** Overnight resting heart rate */
   rhr: number;
   /** HRV (RMSSD, ms) */
@@ -38,7 +38,7 @@ export interface AppSettings {
   reminderTime: string;
   units: 'metric' | 'imperial';
   haptics: boolean;
-  /** Allow Brief to read health data from Apple Health / Health Connect. */
+  /** Write heart data to Apple Health / Health Connect after each scan. */
   healthSync: boolean;
   /** Experimental face-pulse research feature (never affects readiness). */
   faceResearch: boolean;

@@ -3,8 +3,10 @@ import {
   composeRecord,
   energyLevel,
   explain,
+  makeScanMetrics,
   recommendation,
   recoveryScore,
+  recoveryFactors,
   statusWord,
 } from '@/lib/engine';
 import type { DayMetrics } from '@/lib/engine';
@@ -39,6 +41,23 @@ describe('recoveryScore', () => {
   });
 });
 
+describe('recoveryFactors', () => {
+  it('shows the four inputs that make up recovery', () => {
+    const factors = recoveryFactors(
+      metrics({ hrv: 67, rhr: 60, sleepHours: 7.5, bedtimeHour: 24.5 }),
+      BASE
+    );
+
+    expect(factors.map((factor) => factor.label)).toEqual([
+      'HRV',
+      'Resting HR',
+      'Sleep',
+      'Bedtime',
+    ]);
+    expect(factors.map((factor) => factor.points)).toEqual([6, -4, 2, -4]);
+  });
+});
+
 describe('tone', () => {
   it('status words are calm, never clinical', () => {
     expect(statusWord(90)).toBe('Ready.');
@@ -60,9 +79,23 @@ describe('tone', () => {
   });
 });
 
+describe('makeScanMetrics', () => {
+  it('generates awake heart rate well above resting (the watch-mismatch fix)', () => {
+    for (let seed = 1; seed < 40; seed++) {
+      const m = makeScanMetrics([], seed);
+      expect(m.hr - m.rhr).toBeGreaterThanOrEqual(12);
+      expect(m.hr - m.rhr).toBeLessThanOrEqual(22);
+    }
+  });
+
+  it('is deterministic for a given seed', () => {
+    expect(makeScanMetrics([], 42)).toEqual(makeScanMetrics([], 42));
+  });
+});
+
 describe('composeRecord', () => {
   it('assembles a full, well-formed day record', () => {
-    const r = composeRecord('2026-07-25', metrics(), [], 'excellent');
+    const r = composeRecord('2026-07-25', metrics(), [], 'excellent', 7);
     expect(r.date).toBe('2026-07-25');
     expect(r.recovery).toBeGreaterThanOrEqual(28);
     expect(r.recovery).toBeLessThanOrEqual(97);
@@ -72,19 +105,14 @@ describe('composeRecord', () => {
     expect(r.explanation.length).toBeGreaterThan(10);
     expect(r.mission.length).toBeGreaterThan(10);
   });
-
-  it('keeps a missing current heart-rate sample missing', () => {
-    const r = composeRecord('2026-07-25', metrics({ hr: null }), [], 'good');
-    expect(r.hr).toBeNull();
-  });
 });
 
 describe('baselinesFrom', () => {
   it('averages recent history and gives sensible defaults when empty', () => {
     expect(baselinesFrom([]).rhr).toBe(58);
     const history = [
-      composeRecord('2026-07-23', metrics({ rhr: 60 }), [], 'good'),
-      composeRecord('2026-07-24', metrics({ rhr: 56 }), [], 'good'),
+      composeRecord('2026-07-23', metrics({ rhr: 60 }), [], 'good', 1),
+      composeRecord('2026-07-24', metrics({ rhr: 56 }), [], 'good', 2),
     ];
     expect(baselinesFrom(history).rhr).toBe(58);
   });

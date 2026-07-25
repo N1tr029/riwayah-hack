@@ -1,11 +1,11 @@
 /**
  * GPS tracking for runs. Background updates work in a dev build (UIBackgroundModes
  * location via the expo-location plugin) so music can stay open and the screen can
- * lock; Expo Go falls back to foreground-only tracking.
+ * lock; Expo Go falls back to foreground-only tracking; web simulates.
  *
  * expo-location/expo-task-manager are lazy-loaded so a build that predates the
- * native module (or Expo Go on Android) reports GPS as unavailable instead of
- * inventing distance.
+ * native module (or Expo Go on Android) degrades to simulated distance instead
+ * of crashing at import time.
  */
 
 import { Platform } from 'react-native';
@@ -87,7 +87,20 @@ export function haversineMeters(a: GeoPoint, b: GeoPoint): number {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-export type TrackingMode = 'background' | 'foreground' | 'unavailable';
+export type TrackingMode = 'background' | 'foreground' | 'simulated';
+
+/** Clear a location task left behind if the app was terminated mid-run. */
+export async function stopStaleRunTracking(): Promise<void> {
+  if (Platform.OS === 'web') return;
+  const Location = loc();
+  if (!Location) return;
+  try {
+    const started = await Location.hasStartedLocationUpdatesAsync(RUN_LOCATION_TASK);
+    if (started) await Location.stopLocationUpdatesAsync(RUN_LOCATION_TASK);
+  } catch {
+    // There may be no registered task in a fresh install.
+  }
+}
 
 /** Start GPS tracking, preferring background updates. Never throws. */
 export async function startRunTracking(): Promise<{
@@ -95,11 +108,12 @@ export async function startRunTracking(): Promise<{
   stop: () => void;
 }> {
   const Location = Platform.OS === 'web' ? null : loc();
-  if (!Location) return { mode: 'unavailable', stop: () => {} };
+  if (!Location) return { mode: 'simulated', stop: () => {} };
 
   try {
+    await stopStaleRunTracking();
     const fg = await Location.requestForegroundPermissionsAsync();
-    if (fg.status !== 'granted') return { mode: 'unavailable', stop: () => {} };
+    if (fg.status !== 'granted') return { mode: 'simulated', stop: () => {} };
 
     // Background needs a dev build + "Always" permission; fall through on any failure.
     try {
@@ -133,7 +147,7 @@ export async function startRunTracking(): Promise<{
     );
     return { mode: 'foreground', stop: () => sub.remove() };
   } catch {
-    return { mode: 'unavailable', stop: () => {} };
+    return { mode: 'simulated', stop: () => {} };
   }
 }
 
@@ -156,4 +170,9 @@ export function formatPace(distanceMeters: number, elapsedSec: number): string {
 
 export function formatMiles(distanceMeters: number): string {
   return metersToMiles(distanceMeters).toFixed(2);
+}
+
+/** Simulated running speed (m/s) by intent, for web / no-GPS demos. */
+export function simulatedSpeed(type: 'easy' | 'tempo' | 'long'): number {
+  return type === 'tempo' ? 3.35 : type === 'long' ? 2.75 : 2.55;
 }
