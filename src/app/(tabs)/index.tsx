@@ -81,10 +81,7 @@ export default function HomeScreen() {
   const hrvSeries = records.slice(-8).map((r) => r.hrv);
   const rhrSeries = records.slice(-8).map((r) => r.rhr);
   const sleepSeries = records.slice(-8).map((r) => r.sleepHours);
-  const hrSeries = records
-    .slice(-8)
-    .map((r) => r.hr)
-    .filter((heartRate): heartRate is number => heartRate != null);
+  const hrSeries = records.slice(-8).map((r) => r.hr);
   const baseHrv = avg(records.map((r) => r.hrv));
   const baseRhr = avg(records.map((r) => r.rhr));
 
@@ -136,10 +133,15 @@ export default function HomeScreen() {
 
                   <SpectrumBar score={today.recovery} baseline={baseline} />
                   <ThemedText type="small" themeColor="textSecondary" style={styles.baselineNote}>
-                    {history.length >= 3
-                      ? `│ your recent usual sits at ${baseline}`
-                      : '│ building your baseline from real check-ins'}
+                    │ your 30-day usual sits at {baseline}
                   </ThemedText>
+                  <View style={styles.scoreNote}>
+                    <Ionicons name="information-circle-outline" size={15} color={theme.accent} />
+                    <ThemedText type="small" themeColor="textSecondary" style={{ flex: 1 }}>
+                      Not pulse alone: HRV, resting HR, sleep, and bedtime estimates shape this
+                      score. Tap to see the breakdown.
+                    </ThemedText>
+                  </View>
 
                   <View style={[styles.missionRow, { backgroundColor: theme.accentSoft }]}>
                     <Ionicons name="navigate" size={15} color={theme.accent} />
@@ -178,10 +180,10 @@ export default function HomeScreen() {
                 <MetricTile
                   label="Pulse"
                   color={theme.text}
-                  value={today.hr == null ? '—' : `${today.hr}`}
-                  unit={today.hr == null ? undefined : ' bpm'}
+                  value={`${today.hr}`}
+                  unit=" bpm"
                   series={hrSeries}
-                  note={today.hr == null ? 'no recent sample' : 'latest Health sample'}
+                  note="during this scan"
                 />
               </View>
 
@@ -202,12 +204,12 @@ export default function HomeScreen() {
                   Ready for today’s briefing?
                 </ThemedText>
                 <ThemedText type="small" themeColor="textSecondary" style={styles.centerText}>
-                  Sync last night’s data directly from Apple Health.
+                  A calm, one-minute check-in with your body.
                 </ThemedText>
                 <PressScale
                   onPress={() => { tapLight(); router.push('/scan'); }}
                   style={[styles.primaryButton, { backgroundColor: theme.accent }]}>
-                  <ThemedText style={styles.primaryLabel}>Sync Apple Health</ThemedText>
+                  <ThemedText style={styles.primaryLabel}>Start Today’s Brief</ThemedText>
                 </PressScale>
                 {yesterday && (
                   <ThemedText type="small" themeColor="textSecondary">
@@ -279,6 +281,11 @@ const styles = StyleSheet.create({
   },
   baselineNote: {
     marginTop: -Spacing.two,
+  },
+  scoreNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.one,
   },
   missionRow: {
     flexDirection: 'row',

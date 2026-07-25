@@ -1,13 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
+import { buildSeedHistory } from '@/lib/seed';
 import type { FrontCameraScanResult } from '@/lib/face';
 import { todayKey } from '@/lib/format';
+import { stopStaleRunTracking } from '@/lib/geo';
 import { DEFAULT_SETTINGS, type AppSettings, type DayRecord } from '@/lib/types';
 import type { WorkoutSession } from '@/lib/workout';
 
-// v2 intentionally starts clean. v1 contained generated demo history.
-const RECORDS_KEY = 'brief.records.v2';
+const RECORDS_KEY = 'brief.records.v1';
 const SETTINGS_KEY = 'brief.settings.v1';
 const WORKOUTS_KEY = 'brief.workouts.v1';
 const FACE_KEY = 'brief.face.v1';
@@ -41,6 +42,7 @@ export function BriefProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettingsState] = useState<AppSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
+    stopStaleRunTracking().catch(() => {});
     (async () => {
       try {
         const [rawRecords, rawSettings, rawWorkouts, rawFace] = await Promise.all([
@@ -52,13 +54,15 @@ export function BriefProvider({ children }: { children: React.ReactNode }) {
         if (rawRecords) {
           setRecords(JSON.parse(rawRecords));
         } else {
-          setRecords([]);
+          const seeded = buildSeedHistory();
+          setRecords(seeded);
+          AsyncStorage.setItem(RECORDS_KEY, JSON.stringify(seeded));
         }
         if (rawSettings) setSettingsState({ ...DEFAULT_SETTINGS, ...JSON.parse(rawSettings) });
         if (rawWorkouts) setWorkouts(JSON.parse(rawWorkouts));
         if (rawFace) setFaceScans(JSON.parse(rawFace));
       } catch {
-        setRecords([]);
+        setRecords(buildSeedHistory());
       } finally {
         setReady(true);
       }
@@ -124,15 +128,10 @@ export function BriefProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const resetAll = useCallback(() => {
-    persist([]);
-    setWorkouts([]);
-    setFaceScans([]);
+    const seeded = buildSeedHistory();
+    persist(seeded);
     setSettingsState(DEFAULT_SETTINGS);
-    AsyncStorage.multiSet([
-      [SETTINGS_KEY, JSON.stringify(DEFAULT_SETTINGS)],
-      [WORKOUTS_KEY, JSON.stringify([])],
-      [FACE_KEY, JSON.stringify([])],
-    ]).catch(() => {});
+    AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(DEFAULT_SETTINGS)).catch(() => {});
   }, [persist]);
 
   const value = useMemo<BriefStore>(() => {

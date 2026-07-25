@@ -50,9 +50,9 @@ export default function SettingsScreen() {
       resetAll();
       return;
     }
-    Alert.alert('Delete Brief data?', 'This removes saved briefings, runs, and face research data from this device.', [
+    Alert.alert('Reset demo data?', 'This replaces your history with fresh sample data.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: resetAll },
+      { text: 'Reset', style: 'destructive', onPress: resetAll },
     ]);
   };
 
@@ -98,7 +98,7 @@ export default function SettingsScreen() {
                 })}
               </View>
             )}
-            <Row label="Haptics" hint="Soft feedback for buttons and run controls">
+            <Row label="Haptics" hint="Soft pulse feedback during scans">
               <Switch
                 value={settings.haptics}
                 onValueChange={(v) => setSettings({ haptics: v })}
@@ -131,7 +131,7 @@ export default function SettingsScreen() {
               label={healthPlatformName()}
               hint={
                 healthSupported()
-                  ? 'Read sleep and heart metrics for real briefings'
+                  ? 'Write heart rate to your health app after each scan'
                   : 'Needs a development build — not available in Expo Go'
               }>
               <Switch
@@ -147,12 +147,12 @@ export default function SettingsScreen() {
                   if (!granted && Platform.OS !== 'web') {
                     Alert.alert(
                       'Permission needed',
-                      `Allow Brief to read health data in ${healthPlatformName()} to turn this on.`
+                      `Allow Brief to write heart data in ${healthPlatformName()} to turn this on.`
                     );
                   }
                 }}
                 trackColor={{ true: theme.accent }}
-                accessibilityLabel={`Read from ${healthPlatformName()}`}
+                accessibilityLabel={`Sync to ${healthPlatformName()}`}
               />
             </Row>
             <PressScale onPress={exportData}>
@@ -161,8 +161,8 @@ export default function SettingsScreen() {
               </Row>
             </PressScale>
             <PressScale onPress={confirmReset}>
-              <Row label="Delete Brief data" hint="Remove saved briefings and runs">
-                <Ionicons name="trash-outline" size={20} color={theme.low} />
+              <Row label="Reset demo data" hint="Start over with fresh sample history">
+                <Ionicons name="refresh-outline" size={20} color={theme.low} />
               </Row>
             </PressScale>
           </Card>
