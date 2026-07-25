@@ -27,12 +27,13 @@ function pad(n: number): string {
 }
 
 describe('findPatterns', () => {
-  it('spots that volleyball recovers better than weights', () => {
+  it('reports a cautious activity association after repeated examples', () => {
     const records: DayRecord[] = [];
     const schedule: (Workout | undefined)[] = [
       'volleyball', undefined, 'weights', undefined,
       'volleyball', undefined, 'weights', undefined,
-      'volleyball', undefined, 'weights', undefined, undefined, undefined,
+      'volleyball', undefined, 'weights', undefined,
+      'volleyball', undefined, 'weights', undefined,
     ];
     schedule.forEach((w, i) => {
       const prev = schedule[i - 1];
@@ -42,8 +43,9 @@ describe('findPatterns', () => {
 
     const workout = findPatterns(records).find((p) => p.id === 'workout');
     expect(workout).toBeDefined();
-    expect(workout!.detail).toMatch(/volleyball/);
+    expect(workout!.title).toMatch(/volleyball/);
     expect(workout!.detail).toMatch(/weightlifting/);
+    expect(workout!.detail).toMatch(/association, not a cause/);
   });
 
   it('ignores walks in the workout comparison', () => {
@@ -64,7 +66,7 @@ describe('findPatterns', () => {
     }
     const bedtime = findPatterns(records).find((p) => p.id === 'bedtime');
     expect(bedtime).toBeDefined();
-    expect(bedtime!.detail).toMatch(/midnight/);
+    expect(bedtime!.title).toMatch(/Earlier nights/);
   });
 
   it('stays quiet without enough history', () => {

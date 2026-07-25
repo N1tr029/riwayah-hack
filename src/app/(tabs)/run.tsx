@@ -26,7 +26,6 @@ import {
 import {
   RUN_DURATIONS_MIN,
   RUN_PLANS,
-  checkpointsFor,
   planFor,
   runName,
   type RunType,
@@ -81,7 +80,6 @@ export default function RunScreen() {
   if (!ready) return <View style={{ flex: 1, backgroundColor: theme.background }} />;
 
   const plan = planFor(type);
-  const checks = checkpointsFor(type, minutes).length;
   const recent = [...workouts].reverse().slice(0, 10);
 
   const upload = async (w: WorkoutSession) => {
@@ -112,6 +110,29 @@ export default function RunScreen() {
             </ThemedText>
             <ThemedText type="subtitle">Run</ThemedText>
           </View>
+
+          <Card style={[styles.justRunCard, { backgroundColor: theme.accentSoft }]}>
+            <View style={styles.justRunIcon}>
+              <Ionicons name="play" size={24} color={theme.accent} />
+            </View>
+            <View style={styles.justRunCopy}>
+              <ThemedText type="subtitle">Just Run</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Start now. Finish whenever you’re done.
+              </ThemedText>
+            </View>
+            <PressScale
+              onPress={() => {
+                tapLight();
+                router.push({
+                  pathname: '/run-session',
+                  params: { type: 'free', minutes: '0' },
+                });
+              }}
+              style={[styles.justRunButton, { backgroundColor: theme.accent }]}>
+              <ThemedText style={styles.primaryLabel}>Go</ThemedText>
+            </PressScale>
+          </Card>
 
           <Card>
             <ThemedText type="smallBold" themeColor="textSecondary" style={styles.caps}>
@@ -149,8 +170,8 @@ export default function RunScreen() {
             <View style={[styles.planLine, { backgroundColor: theme.accentSoft }]}>
               <Ionicons name="heart" size={14} color={theme.heart} />
               <ThemedText type="small" style={{ flex: 1, fontWeight: '600' }}>
-                Your phone will buzz for a fingertip heart rate check every {plan.checkEveryMin} min
-                — {checks} {checks === 1 ? 'check' : 'checks'} on this run.
+                Ends automatically after {minutes} minutes. Heart rate appears only when Apple
+                Health publishes a real sample.
               </ThemedText>
             </View>
 
@@ -160,7 +181,7 @@ export default function RunScreen() {
                 router.push({ pathname: '/run-session', params: { type, minutes: `${minutes}` } });
               }}
               style={[styles.primaryButton, { backgroundColor: theme.accent }]}>
-              <ThemedText style={styles.primaryLabel}>Start Run</ThemedText>
+              <ThemedText style={styles.primaryLabel}>Start planned run</ThemedText>
             </PressScale>
           </Card>
 
@@ -215,7 +236,8 @@ export default function RunScreen() {
                     <ThemedText style={{ fontWeight: '700' }}>{runName(w.type)}</ThemedText>
                     <ThemedText type="small" themeColor="textSecondary">
                       {friendlyDate(w.date)} · {formatDuration(w.durationSec)} ·{' '}
-                      {formatMiles(w.distanceMeters ?? 0)} mi · avg {w.avgHr} bpm
+                      {formatMiles(w.distanceMeters ?? 0)} mi ·{' '}
+                      {w.avgHr > 0 ? `avg ${w.avgHr} bpm` : 'no HR data'}
                     </ThemedText>
                   </View>
                   {w.uploadedToStrava ? (
@@ -271,6 +293,31 @@ const styles = StyleSheet.create({
   sectionTitle: {
     marginTop: Spacing.two,
     marginLeft: Spacing.two,
+  },
+  justRunCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
+  justRunIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.55)',
+  },
+  justRunCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  justRunButton: {
+    minWidth: 64,
+    minHeight: 46,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.three,
   },
   chipRow: {
     flexDirection: 'row',

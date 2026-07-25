@@ -1,11 +1,11 @@
 /**
  * GPS tracking for runs. Background updates work in a dev build (UIBackgroundModes
  * location via the expo-location plugin) so music can stay open and the screen can
- * lock; Expo Go falls back to foreground-only tracking; web simulates.
+ * lock; Expo Go falls back to foreground-only tracking.
  *
  * expo-location/expo-task-manager are lazy-loaded so a build that predates the
- * native module (or Expo Go on Android) degrades to simulated distance instead
- * of crashing at import time.
+ * native module (or Expo Go on Android) reports GPS as unavailable instead of
+ * inventing distance.
  */
 
 import { Platform } from 'react-native';
@@ -87,7 +87,7 @@ export function haversineMeters(a: GeoPoint, b: GeoPoint): number {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-export type TrackingMode = 'background' | 'foreground' | 'simulated';
+export type TrackingMode = 'background' | 'foreground' | 'unavailable';
 
 /** Start GPS tracking, preferring background updates. Never throws. */
 export async function startRunTracking(): Promise<{
@@ -95,11 +95,11 @@ export async function startRunTracking(): Promise<{
   stop: () => void;
 }> {
   const Location = Platform.OS === 'web' ? null : loc();
-  if (!Location) return { mode: 'simulated', stop: () => {} };
+  if (!Location) return { mode: 'unavailable', stop: () => {} };
 
   try {
     const fg = await Location.requestForegroundPermissionsAsync();
-    if (fg.status !== 'granted') return { mode: 'simulated', stop: () => {} };
+    if (fg.status !== 'granted') return { mode: 'unavailable', stop: () => {} };
 
     // Background needs a dev build + "Always" permission; fall through on any failure.
     try {
@@ -133,7 +133,7 @@ export async function startRunTracking(): Promise<{
     );
     return { mode: 'foreground', stop: () => sub.remove() };
   } catch {
-    return { mode: 'simulated', stop: () => {} };
+    return { mode: 'unavailable', stop: () => {} };
   }
 }
 
@@ -156,9 +156,4 @@ export function formatPace(distanceMeters: number, elapsedSec: number): string {
 
 export function formatMiles(distanceMeters: number): string {
   return metersToMiles(distanceMeters).toFixed(2);
-}
-
-/** Simulated running speed (m/s) by intent, for web / no-GPS demos. */
-export function simulatedSpeed(type: 'easy' | 'tempo' | 'long'): number {
-  return type === 'tempo' ? 3.35 : type === 'long' ? 2.75 : 2.55;
 }

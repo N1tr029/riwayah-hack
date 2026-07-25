@@ -44,9 +44,15 @@ export function SpectrumBar({ score, baseline, showLabels = true, onTint = false
       </View>
       {showLabels && (
         <View style={styles.labels}>
-          <ThemedText style={[styles.label, styles.l55, { color: theme.textSecondary }]}>RECOVER</ThemedText>
-          <ThemedText style={[styles.label, styles.l15, { color: theme.textSecondary }]}>STEADY</ThemedText>
-          <ThemedText style={[styles.label, styles.l30, { color: theme.textSecondary }]}>READY</ThemedText>
+          <ThemedText numberOfLines={1} style={[styles.label, { color: theme.textSecondary }]}>
+            RECOVER
+          </ThemedText>
+          <ThemedText numberOfLines={1} style={[styles.label, { color: theme.textSecondary }]}>
+            STEADY
+          </ThemedText>
+          <ThemedText numberOfLines={1} style={[styles.label, { color: theme.textSecondary }]}>
+            READY
+          </ThemedText>
         </View>
       )}
     </View>
@@ -97,13 +103,12 @@ const styles = StyleSheet.create({
   },
   labels: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   label: {
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.8,
   },
-  l55: { width: '55%' },
-  l15: { width: '15%', textAlign: 'center' },
-  l30: { width: '30%', textAlign: 'right' },
 });

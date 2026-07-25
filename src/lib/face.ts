@@ -369,7 +369,7 @@ export function experimentalFacePulse(
 ): ExperimentalFacePulse | null {
   if (!enabled) return null;
   if (!quality.usable || quality.score < 0.8 || quality.motion !== 'steady') return null;
-  if (!fingerScan) return null;
+  if (!fingerScan || fingerScan.hr == null) return null;
   const rng = mulberry32(seed ^ 0x5f356495);
   const candidateHr = Math.round(fingerScan.hr + range(rng, -6, 6));
   if (candidateHr < 40 || candidateHr > 190) return null;

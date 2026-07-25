@@ -1,6 +1,6 @@
 # Brief — the morning briefing for your body
 
-A daily readiness app built with [Expo](https://expo.dev) (React Native, SDK 54 — pinned to what the app-store Expo Go clients support). Open it each morning, run a calm ~30-second scan, and get one clear briefing: how you recovered, how much energy you have, and one mission for the day. No jargon, no charts you don't need.
+A daily readiness app built with [Expo](https://expo.dev) (React Native, SDK 54 — pinned to what the app-store Expo Go clients support). Open it each morning, sync Apple Health, and get one clear briefing from recorded sleep and heart data.
 
 Built at a hackathon by a mixed Mac/Windows team — everything below works the same on both.
 
@@ -19,26 +19,26 @@ npm install
 npx expo start
 ```
 
-Scan the QR code with your phone (iPhone: Camera app; Android: from inside Expo Go). The app opens in Expo Go and **hot-reloads on every save**. If the venue Wi-Fi blocks the connection, use `npx expo start --tunnel`. Press `w` for the browser version (the camera scan is simulated on web), `i` for the iOS Simulator (Mac only).
+Scan the QR code with your phone (iPhone: Camera app; Android: from inside Expo Go). The app opens in Expo Go and **hot-reloads on every save**. If the venue Wi-Fi blocks the connection, use `npx expo start --tunnel`. Press `w` for the browser version or `i` for the iOS Simulator (Mac only). Apple Health requires the native development build described below.
 
 ## How it works
 
-- **Scan** ([src/app/scan.tsx](src/app/scan.tsx)) — camera + torch turn on, you cover the lens with a fingertip. The accelerometer genuinely detects movement ("Gently hold still") and downgrades signal confidence. The biometric numbers themselves come from a plausible generator anchored to your history — the seam for real camera-PPG is `makeScanMetrics` in [src/lib/engine.ts](src/lib/engine.ts).
+- **Health sync** ([src/app/scan.tsx](src/app/scan.tsx)) — reads sleep, resting heart rate, HRV, and a recent heart-rate sample directly from Apple Health. Missing values stay missing.
 - **Engine** ([src/lib/engine.ts](src/lib/engine.ts)) — turns HRV/RHR/sleep into a recovery score, calm natural-language explanations, one recommendation, one mission. Always compared to *your* baseline, never a population.
-- **Patterns** ([src/lib/patterns.ts](src/lib/patterns.ts)) — real computations over your history ("You recover better after volleyball than weightlifting", "Recovery drops when you sleep after midnight").
-- **Store** ([src/lib/store.tsx](src/lib/store.tsx)) — AsyncStorage, seeded with 3 weeks of demo history on first launch (reset from Settings).
+- **Patterns** ([src/lib/patterns.ts](src/lib/patterns.ts)) — conservative associations computed only after enough real history exists.
+- **Store** ([src/lib/store.tsx](src/lib/store.tsx)) — AsyncStorage containing only the user's saved records and runs; no demo history is seeded.
 
 ## Project layout
 
 - `src/app/` — screens, one file per route ([expo-router](https://docs.expo.dev/router/introduction/)): tabs `(tabs)/` (Today / Insights / History), plus `scan`, `brief`, `details`, `settings`, `day/[date]`
 - `src/components/` — UI building blocks (score ring, sparkline, waveform, cards)
-- `src/lib/` — engine, patterns, storage, seed data
+- `src/lib/` — health access, engine, patterns, storage, and run tracking
 - `src/constants/theme.ts` — the calm palette (light + dark)
 
 ## Health sync (Apple Health / Google Health Connect)
 
-Brief can write each scan's heart rate + overnight resting heart rate to **Apple Health** (iOS)
-and **Health Connect** (Android, incl. HRV RMSSD). This needs native modules, so it does NOT work
+Brief reads sleep and heart metrics from **Apple Health** (iOS) and **Health Connect** (Android).
+This needs native modules, so it does NOT work
 inside Expo Go — the Settings toggle stays disabled there and explains why.
 
 To use it, make a development build:
@@ -49,17 +49,15 @@ To use it, make a development build:
   `eas build --profile development --platform android` in the cloud — no local toolchain needed.
   Requires Health Connect installed (built into Android 14+).
 
-The integration lives in [src/lib/health.ts](src/lib/health.ts) and fails soft: if the health
-write fails, the briefing still completes.
+The integration lives in [src/lib/health.ts](src/lib/health.ts). If a required sample is missing,
+Brief shows that state instead of generating a replacement value.
 
 ## Runs + Strava
 
-The Run tab plans a workout: your intent (easy / tempo / long) sets how often the phone buzzes
-for a fingertip heart rate check (every 10 / 5 / 15 min). Each check becomes a heart rate
-trackpoint; finished runs export as TCX and upload to Strava (`activity:write`). One-tap sync
-needs a Strava API app — see `.env.example`; without it, share the TCX file instead. Checkpoint
-buzzes also fire as local notifications so they reach you mid-run with the screen locked
-(dev build; in Expo Go the in-app haptics still work while the app is open).
+The Run tab has a one-tap **Just Run** mode plus optional timed plans. Distance comes only from
+GPS, and heart rate is included only when Apple Health publishes a real sample during the run.
+Finished runs export as TCX and upload to Strava (`activity:write`). One-tap sync needs a Strava
+API app — see `.env.example`; without it, share the TCX file instead.
 
 ## Team workflow
 

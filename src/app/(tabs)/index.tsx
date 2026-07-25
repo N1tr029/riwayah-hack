@@ -81,7 +81,10 @@ export default function HomeScreen() {
   const hrvSeries = records.slice(-8).map((r) => r.hrv);
   const rhrSeries = records.slice(-8).map((r) => r.rhr);
   const sleepSeries = records.slice(-8).map((r) => r.sleepHours);
-  const hrSeries = records.slice(-8).map((r) => r.hr);
+  const hrSeries = records
+    .slice(-8)
+    .map((r) => r.hr)
+    .filter((heartRate): heartRate is number => heartRate != null);
   const baseHrv = avg(records.map((r) => r.hrv));
   const baseRhr = avg(records.map((r) => r.rhr));
 
@@ -133,7 +136,9 @@ export default function HomeScreen() {
 
                   <SpectrumBar score={today.recovery} baseline={baseline} />
                   <ThemedText type="small" themeColor="textSecondary" style={styles.baselineNote}>
-                    │ your 30-day usual sits at {baseline}
+                    {history.length >= 3
+                      ? `│ your recent usual sits at ${baseline}`
+                      : '│ building your baseline from real check-ins'}
                   </ThemedText>
 
                   <View style={[styles.missionRow, { backgroundColor: theme.accentSoft }]}>
@@ -173,10 +178,10 @@ export default function HomeScreen() {
                 <MetricTile
                   label="Pulse"
                   color={theme.text}
-                  value={`${today.hr}`}
-                  unit=" bpm"
+                  value={today.hr == null ? '—' : `${today.hr}`}
+                  unit={today.hr == null ? undefined : ' bpm'}
                   series={hrSeries}
-                  note="during this scan"
+                  note={today.hr == null ? 'no recent sample' : 'latest Health sample'}
                 />
               </View>
 
@@ -197,12 +202,12 @@ export default function HomeScreen() {
                   Ready for today’s briefing?
                 </ThemedText>
                 <ThemedText type="small" themeColor="textSecondary" style={styles.centerText}>
-                  A calm, one-minute check-in with your body.
+                  Sync last night’s data directly from Apple Health.
                 </ThemedText>
                 <PressScale
                   onPress={() => { tapLight(); router.push('/scan'); }}
                   style={[styles.primaryButton, { backgroundColor: theme.accent }]}>
-                  <ThemedText style={styles.primaryLabel}>Start Today’s Brief</ThemedText>
+                  <ThemedText style={styles.primaryLabel}>Sync Apple Health</ThemedText>
                 </PressScale>
                 {yesterday && (
                   <ThemedText type="small" themeColor="textSecondary">

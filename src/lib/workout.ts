@@ -1,39 +1,31 @@
 /**
- * Guided runs: the intended run type sets how often Brief asks for a
- * finger-on-camera heart rate check, and each captured sample becomes a
- * trackpoint in the TCX file that ports the run (with heart rate) to Strava.
+ * Run tracking models. Heart-rate samples are included only when they were
+ * actually published by Apple Health during the run.
  */
 
-import { mulberry32, range } from '@/lib/rng';
-
-export type RunType = 'easy' | 'tempo' | 'long';
+export type RunType = 'free' | 'easy' | 'tempo' | 'long';
 
 export interface RunPlanInfo {
   type: RunType;
   label: string;
   description: string;
-  /** Minutes between finger-on-camera heart rate checks. */
-  checkEveryMin: number;
 }
 
 export const RUN_PLANS: RunPlanInfo[] = [
   {
     type: 'easy',
     label: 'Easy',
-    description: 'Conversational pace. Checks every 10 minutes.',
-    checkEveryMin: 10,
+    description: 'Conversational pace with an automatic finish time.',
   },
   {
     type: 'tempo',
     label: 'Tempo',
-    description: 'Comfortably hard. Checks every 5 minutes.',
-    checkEveryMin: 5,
+    description: 'A comfortably hard run with an automatic finish time.',
   },
   {
     type: 'long',
     label: 'Long',
-    description: 'Steady endurance. Checks every 15 minutes.',
-    checkEveryMin: 15,
+    description: 'Steady endurance with an automatic finish time.',
   },
 ];
 
@@ -45,17 +37,14 @@ export function planFor(type: RunType): RunPlanInfo {
 
 /** Checkpoint times in seconds for a planned run. */
 export function checkpointsFor(type: RunType, plannedMin: number): number[] {
-  const every = planFor(type).checkEveryMin * 60;
-  const out: number[] = [];
-  for (let t = every; t < plannedMin * 60; t += every) out.push(t);
-  return out;
+  return [];
 }
 
 export interface WorkoutSample {
   /** Seconds since the run started. */
   atSec: number;
   hr: number;
-  /** False when the runner skipped/missed the check and the value is estimated. */
+  /** True when read from the device health store. */
   captured: boolean;
 }
 
@@ -79,21 +68,9 @@ export interface WorkoutSession {
   avgHr: number;
   maxHr: number;
   distanceMeters: number;
-  /** Decimated GPS trace; empty when GPS was unavailable/simulated. */
+  /** Decimated GPS trace; empty when GPS was unavailable. */
   route: RoutePoint[];
   uploadedToStrava?: boolean;
-}
-
-/**
- * Plausible running heart rate for a checkpoint. Base by intent, cardiac
- * drift over time, deterministic noise. The seam for real PPG, same as the
- * morning scan.
- */
-export function runHeartRate(type: RunType, elapsedSec: number, seed: number): number {
-  const base = type === 'tempo' ? 158 : type === 'long' ? 146 : 138;
-  const drift = Math.min((elapsedSec / 60) * 0.35, 14);
-  const rng = mulberry32((seed ^ Math.floor(elapsedSec / 30)) | 0);
-  return Math.round(Math.min(186, Math.max(104, base + drift + range(rng, -6, 6))));
 }
 
 export function summarize(samples: WorkoutSample[]): { avgHr: number; maxHr: number } {
@@ -106,6 +83,7 @@ export function summarize(samples: WorkoutSample[]): { avgHr: number; maxHr: num
 }
 
 const RUN_NAMES: Record<RunType, string> = {
+  free: 'Run',
   easy: 'Easy run',
   tempo: 'Tempo run',
   long: 'Long run',
@@ -171,15 +149,19 @@ export function buildTcx(session: WorkoutSession): string {
     `      <Lap StartTime="${xmlTime(start)}">`,
     `        <TotalTimeSeconds>${session.durationSec}</TotalTimeSeconds>`,
     `        <DistanceMeters>${Math.round(session.distanceMeters ?? 0)}</DistanceMeters>`,
-    `        <AverageHeartRateBpm><Value>${session.avgHr}</Value></AverageHeartRateBpm>`,
-    `        <MaximumHeartRateBpm><Value>${session.maxHr}</Value></MaximumHeartRateBpm>`,
+    ...(session.avgHr > 0
+      ? [`        <AverageHeartRateBpm><Value>${session.avgHr}</Value></AverageHeartRateBpm>`]
+      : []),
+    ...(session.maxHr > 0
+      ? [`        <MaximumHeartRateBpm><Value>${session.maxHr}</Value></MaximumHeartRateBpm>`]
+      : []),
     '        <Intensity>Active</Intensity>',
     '        <TriggerMethod>Manual</TriggerMethod>',
     '        <Track>',
     points,
     '        </Track>',
     '      </Lap>',
-    `      <Notes>${runName(session.type)} briefed by Brief — heart rate from fingertip scans.</Notes>`,
+    `      <Notes>${runName(session.type)} recorded by Brief — heart rate from Apple Health when available.</Notes>`,
     '    </Activity>',
     '  </Activities>',
     '</TrainingCenterDatabase>',

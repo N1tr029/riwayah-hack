@@ -1,13 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { buildSeedHistory } from '@/lib/seed';
 import type { FrontCameraScanResult } from '@/lib/face';
 import { todayKey } from '@/lib/format';
 import { DEFAULT_SETTINGS, type AppSettings, type DayRecord } from '@/lib/types';
 import type { WorkoutSession } from '@/lib/workout';
 
-const RECORDS_KEY = 'brief.records.v1';
+// v2 intentionally starts clean. v1 contained generated demo history.
+const RECORDS_KEY = 'brief.records.v2';
 const SETTINGS_KEY = 'brief.settings.v1';
 const WORKOUTS_KEY = 'brief.workouts.v1';
 const FACE_KEY = 'brief.face.v1';
@@ -52,15 +52,13 @@ export function BriefProvider({ children }: { children: React.ReactNode }) {
         if (rawRecords) {
           setRecords(JSON.parse(rawRecords));
         } else {
-          const seeded = buildSeedHistory();
-          setRecords(seeded);
-          AsyncStorage.setItem(RECORDS_KEY, JSON.stringify(seeded));
+          setRecords([]);
         }
         if (rawSettings) setSettingsState({ ...DEFAULT_SETTINGS, ...JSON.parse(rawSettings) });
         if (rawWorkouts) setWorkouts(JSON.parse(rawWorkouts));
         if (rawFace) setFaceScans(JSON.parse(rawFace));
       } catch {
-        setRecords(buildSeedHistory());
+        setRecords([]);
       } finally {
         setReady(true);
       }
@@ -126,10 +124,15 @@ export function BriefProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const resetAll = useCallback(() => {
-    const seeded = buildSeedHistory();
-    persist(seeded);
+    persist([]);
+    setWorkouts([]);
+    setFaceScans([]);
     setSettingsState(DEFAULT_SETTINGS);
-    AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(DEFAULT_SETTINGS)).catch(() => {});
+    AsyncStorage.multiSet([
+      [SETTINGS_KEY, JSON.stringify(DEFAULT_SETTINGS)],
+      [WORKOUTS_KEY, JSON.stringify([])],
+      [FACE_KEY, JSON.stringify([])],
+    ]).catch(() => {});
   }, [persist]);
 
   const value = useMemo<BriefStore>(() => {

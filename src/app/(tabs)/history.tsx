@@ -75,6 +75,16 @@ export default function HistoryScreen() {
               </ThemedText>
             </View>
           }
+          ListEmptyComponent={
+            <View style={[styles.empty, { backgroundColor: theme.card }]}>
+              <Ionicons name="time-outline" size={30} color={theme.textSecondary} />
+              <ThemedText style={{ fontWeight: '600' }}>No history yet</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" style={styles.emptyText}>
+                Real briefings will appear here after you sync Apple Health. Demo weeks are no
+                longer added.
+              </ThemedText>
+            </View>
+          }
           contentContainerStyle={[styles.content, { paddingBottom: BottomTabInset + Spacing.five }]}
           showsVerticalScrollIndicator={false}
         />
@@ -97,6 +107,15 @@ const styles = StyleSheet.create({
   header: {
     paddingVertical: Spacing.three,
     gap: Spacing.one,
+  },
+  empty: {
+    alignItems: 'center',
+    gap: Spacing.two,
+    padding: Spacing.five,
+    borderRadius: Radius.card,
+  },
+  emptyText: {
+    textAlign: 'center',
   },
   row: {
     flexDirection: 'row',

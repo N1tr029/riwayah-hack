@@ -38,9 +38,13 @@ export default function DetailsScreen() {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {record && (
             <Card style={{ paddingVertical: Spacing.two }}>
-              <MetricRow icon="heart-outline" label="Heart rate" value={`${record.hr} bpm`} />
+              <MetricRow
+                icon="heart-outline"
+                label="Heart rate"
+                value={record.hr == null ? 'No recent sample' : `${record.hr} bpm`}
+              />
               <MetricRow icon="pulse-outline" label="Resting heart rate" value={`${record.rhr} bpm`} />
-              <MetricRow icon="analytics-outline" label="HRV (RMSSD)" value={`${record.hrv} ms`} />
+              <MetricRow icon="analytics-outline" label="HRV" value={`${record.hrv} ms`} />
               <MetricRow icon="moon-outline" label="Sleep" value={`${record.sleepHours} h`} />
               <MetricRow
                 icon="radio-outline"

@@ -222,7 +222,7 @@ export default function FaceScanScreen() {
             </ThemedText>
             <View style={styles.steps}>
               <ThemedText themeColor="textSecondary" style={styles.centerText}>
-                A 20-second front-camera check. Hold the phone at arm's length in even light,
+                A 20-second front-camera check. Hold the phone at arm&apos;s length in even light,
                 keep a neutral expression, and follow the dot.
               </ThemedText>
               <ThemedText type="small" themeColor="textSecondary" style={styles.centerText}>
