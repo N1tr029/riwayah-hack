@@ -126,7 +126,7 @@ export default function SettingsScreen() {
             </PressScale>
             <PressScale onPress={confirmReset}>
               <Row label="Reset demo data" hint="Start over with fresh sample history">
-                <Ionicons name="refresh-outline" size={20} color={theme.clay} />
+                <Ionicons name="refresh-outline" size={20} color={theme.low} />
               </Row>
             </PressScale>
           </Card>

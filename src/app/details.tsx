@@ -64,7 +64,7 @@ export default function DetailsScreen() {
             <ThemedText type="smallBold" themeColor="textSecondary" style={styles.caps}>
               Resting heart rate · 14 days
             </ThemedText>
-            <Sparkline values={last14.map((r) => r.rhr)} color={theme.sage} height={60} />
+            <Sparkline values={last14.map((r) => r.rhr)} color={theme.heart} height={60} />
             <ThemedText type="small" themeColor="textSecondary">
               Overnight beats per minute. Lower than your baseline is usually a good sign.
             </ThemedText>

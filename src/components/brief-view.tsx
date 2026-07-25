@@ -4,7 +4,6 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { Card } from '@/components/ui/card';
-import { MetricRow } from '@/components/ui/metric-row';
 import { PressScale } from '@/components/ui/press-scale';
 import { ScoreRing } from '@/components/ui/score-ring';
 import { Radius, Spacing, scoreColor } from '@/constants/theme';
@@ -18,43 +17,53 @@ interface Props {
   onViewDetails?: () => void;
 }
 
-const ENERGY_ICON = 'flash-outline' as const;
-const STRESS_ICON = 'water-outline' as const;
-const SLEEP_ICON = 'moon-outline' as const;
-
 /** Quiet, staggered entrance — short, ease-out, no bounce. */
 const enter = (step: number) => FadeInDown.duration(320).delay(step * 70);
 
-/** The heart of the app: one calm, readable briefing. */
+/** Apple-Health-style stat tile: metric identity color, bold value. */
+function StatTile({
+  icon,
+  color,
+  label,
+  value,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <Card style={styles.tile}>
+      <View style={styles.tileHeader}>
+        <Ionicons name={icon} size={15} color={color} />
+        <ThemedText type="smallBold" style={[styles.tileLabel, { color }]}>
+          {label}
+        </ThemedText>
+      </View>
+      <ThemedText style={styles.tileValue}>{value}</ThemedText>
+    </Card>
+  );
+}
+
+/** The heart of the app: one bold, readable briefing. */
 export function BriefView({ record, history, onViewDetails }: Props) {
   const theme = useTheme();
   const color = scoreColor(record.recovery, theme);
-
-  const stressTint =
-    record.stress === 'Low' ? theme.sage : record.stress === 'Balanced' ? theme.accent : theme.clay;
-  const energyTint =
-    record.energy === 'High' ? theme.sage : record.energy === 'Steady' ? theme.accent : theme.clay;
-  const sleepTint =
-    record.sleep === 'Recovered' ? theme.sage : record.sleep === 'Adequate' ? theme.accent : theme.clay;
 
   return (
     <View style={styles.container}>
       <Animated.View entering={enter(0)} style={styles.hero}>
         <ScoreRing score={record.recovery} />
-        <ThemedText type="subtitle" style={styles.status}>
-          {record.statusWord}
-        </ThemedText>
+        <ThemedText style={styles.status}>{record.statusWord}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
           {baselineLine(record.recovery, history, record.date)}
         </ThemedText>
       </Animated.View>
 
-      <Animated.View entering={enter(1)}>
-        <Card style={styles.metricsCard}>
-          <MetricRow icon={ENERGY_ICON} label="Energy" value={record.energy} tint={energyTint} />
-          <MetricRow icon={STRESS_ICON} label="Stress" value={record.stress} tint={stressTint} />
-          <MetricRow icon={SLEEP_ICON} label="Sleep" value={record.sleep} tint={sleepTint} />
-        </Card>
+      <Animated.View entering={enter(1)} style={styles.tileRow}>
+        <StatTile icon="flash" color={theme.energy} label="Energy" value={record.energy} />
+        <StatTile icon="water" color={theme.stress} label="Stress" value={record.stress} />
+        <StatTile icon="moon" color={theme.sleep} label="Sleep" value={record.sleep} />
       </Animated.View>
 
       <Animated.View entering={enter(2)}>
@@ -70,9 +79,9 @@ export function BriefView({ record, history, onViewDetails }: Props) {
       </Animated.View>
 
       <Animated.View entering={enter(3)}>
-        <Card style={{ backgroundColor: theme.accentSoft, borderColor: 'transparent' }}>
+        <Card style={{ backgroundColor: theme.accentSoft }}>
           <View style={styles.missionHeader}>
-            <Ionicons name="navigate-outline" size={16} color={theme.accent} />
+            <Ionicons name="navigate" size={15} color={theme.accent} />
             <ThemedText type="smallBold" style={[styles.caps, { color: theme.accent }]}>
               Today’s mission
             </ThemedText>
@@ -83,7 +92,12 @@ export function BriefView({ record, history, onViewDetails }: Props) {
 
       <Animated.View entering={enter(4)} style={styles.footerRow}>
         <View style={styles.confidence}>
-          <View style={[styles.confidenceDot, { backgroundColor: record.confidence === 'weak' ? theme.clay : color }]} />
+          <View
+            style={[
+              styles.confidenceDot,
+              { backgroundColor: record.confidence === 'weak' ? theme.warn : color },
+            ]}
+          />
           <ThemedText type="small" themeColor="textSecondary">
             {CONFIDENCE_LABEL[record.confidence]}
           </ThemedText>
@@ -112,10 +126,35 @@ const styles = StyleSheet.create({
   },
   status: {
     marginTop: Spacing.two,
+    fontSize: 34,
+    lineHeight: 40,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
-  metricsCard: {
-    paddingVertical: Spacing.two,
+  tileRow: {
+    flexDirection: 'row',
+    gap: Spacing.two + 2,
+  },
+  tile: {
+    flex: 1,
+    padding: Spacing.three,
+    gap: Spacing.one,
     borderRadius: Radius.card,
+  },
+  tileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  tileLabel: {
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  tileValue: {
+    fontSize: 19,
+    lineHeight: 24,
+    fontWeight: '700',
   },
   caps: {
     textTransform: 'uppercase',
@@ -125,7 +164,7 @@ const styles = StyleSheet.create({
   recommendation: {
     fontSize: 19,
     lineHeight: 26,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   missionHeader: {
     flexDirection: 'row',

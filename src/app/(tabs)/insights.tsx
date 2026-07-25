@@ -71,7 +71,7 @@ export default function InsightsScreen() {
             <ThemedText type="smallBold" themeColor="textSecondary" style={styles.caps}>
               This month
             </ThemedText>
-            <Sparkline values={monthValues} color={theme.sage} fill={theme.sageSoft} height={64} />
+            <Sparkline values={monthValues} color={theme.good} fill={theme.goodSoft} height={64} />
             <ThemedText type="small" themeColor="textSecondary">
               {monthValues.length} briefings — readiness averaging {Math.round(avg(monthValues))}.
             </ThemedText>
@@ -108,9 +108,9 @@ export default function InsightsScreen() {
           )}
 
           {streak >= 3 && (
-            <Card style={[styles.patternCard, { backgroundColor: theme.sageSoft, borderColor: 'transparent' }]}>
+            <Card style={[styles.patternCard, { backgroundColor: theme.goodSoft }]}>
               <View style={[styles.patternIcon, { backgroundColor: theme.card }]}>
-                <Ionicons name="checkmark-done-outline" size={18} color={theme.sage} />
+                <Ionicons name="checkmark-done-outline" size={18} color={theme.good} />
               </View>
               <View style={styles.patternText}>
                 <ThemedText style={{ fontWeight: '600' }}>

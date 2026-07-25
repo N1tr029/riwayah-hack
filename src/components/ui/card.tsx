@@ -3,21 +3,16 @@ import { StyleSheet, View, type ViewProps } from 'react-native';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-/** Rounded surface card — the basic building block of every screen. */
+/** Borderless surface card, Apple-Health style — white on system gray in
+ * light mode, elevated charcoal on near-black in dark. */
 export function Card({ style, ...rest }: ViewProps) {
   const theme = useTheme();
-  return (
-    <View
-      style={[styles.card, { backgroundColor: theme.card, borderColor: theme.hairline }, style]}
-      {...rest}
-    />
-  );
+  return <View style={[styles.card, { backgroundColor: theme.card }, style]} {...rest} />;
 }
 
 const styles = StyleSheet.create({
   card: {
     borderRadius: Radius.card,
-    borderWidth: StyleSheet.hairlineWidth,
     padding: Spacing.four,
     gap: Spacing.two,
   },

@@ -256,7 +256,7 @@ export default function ScanScreen() {
         {phase === 'measuring' && (
           <View style={styles.body}>
             {useCamera ? (
-              <View style={[styles.cameraDot, { borderColor: fingerOn ? theme.sage : theme.hairline }]}>
+              <View style={[styles.cameraDot, { borderColor: fingerOn ? theme.good : theme.hairline }]}>
                 <CameraView
                   ref={cameraRef}
                   style={styles.camera}
@@ -276,7 +276,7 @@ export default function ScanScreen() {
             <ProgressRing progress={elapsed / duration} remaining={remaining} dimmed={waiting} />
 
             <View style={{ alignSelf: 'stretch', opacity: waiting ? 0.25 : 1 }}>
-              <Waveform color={theme.accent} />
+              <Waveform color={theme.heart} />
             </View>
 
             <ThemedText type="subtitle" style={styles.centerText}>
@@ -290,8 +290,8 @@ export default function ScanScreen() {
 
         {phase === 'retry' && (
           <View style={styles.body}>
-            <View style={[styles.iconCircle, { backgroundColor: theme.claySoft }]}>
-              <Ionicons name="hand-left-outline" size={32} color={theme.clay} />
+            <View style={[styles.iconCircle, { backgroundColor: theme.warnSoft }]}>
+              <Ionicons name="hand-left-outline" size={32} color={theme.warn} />
             </View>
             <ThemedText type="subtitle" style={styles.centerText}>
               We noticed movement.

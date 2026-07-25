@@ -1,5 +1,4 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -41,10 +40,10 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
             <View>
-              <ThemedText type="subtitle">{greeting()}</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
+              <ThemedText type="smallBold" themeColor="textSecondary" style={styles.caps}>
                 {friendlyDate(todayKey())}
               </ThemedText>
+              <ThemedText type="subtitle">{greeting()}</ThemedText>
             </View>
             <PressScale
               onPress={() => router.push('/settings')}
@@ -78,15 +77,9 @@ export default function HomeScreen() {
             </PressScale>
           ) : (
             <Card style={styles.heroCard}>
-              <LinearGradient
-                colors={[theme.accentSoft, theme.sageSoft]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
               <View style={styles.heroInner}>
-                <View style={[styles.heroIcon, { backgroundColor: theme.card }]}>
-                  <Ionicons name="sunny-outline" size={30} color={theme.accent} />
+                <View style={[styles.heroIcon, { backgroundColor: theme.accentSoft }]}>
+                  <Ionicons name="sunny" size={30} color={theme.accent} />
                 </View>
                 <ThemedText type="subtitle" style={styles.centerText}>
                   Ready for today’s briefing?
@@ -180,8 +173,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
   },
   heroCard: {
-    overflow: 'hidden',
-    borderColor: 'transparent',
     paddingVertical: Spacing.five,
   },
   heroInner: {

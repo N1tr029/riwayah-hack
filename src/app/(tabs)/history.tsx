@@ -34,7 +34,7 @@ function DayRow({ record }: { record: DayRecord }) {
   return (
     <PressScale
       onPress={() => router.push({ pathname: '/day/[date]', params: { date: record.date } })}
-      style={[styles.row, { backgroundColor: theme.card, borderColor: theme.hairline }]}>
+      style={[styles.row, { backgroundColor: theme.card }]}>
       <View style={[styles.scoreChip, { backgroundColor: chipBg }]}>
         <ThemedText style={[styles.scoreText, { color: chipColor }]}>{record.recovery}</ThemedText>
       </View>
@@ -108,7 +108,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.three,
     borderRadius: Radius.card,
-    borderWidth: StyleSheet.hairlineWidth,
     padding: Spacing.three,
   },
   scoreChip: {

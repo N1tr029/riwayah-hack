@@ -7,10 +7,10 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 
 import { ThemedText } from '@/components/themed-text';
-import { scoreColor } from '@/constants/theme';
+import { Fonts, lighten, scoreColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -49,7 +49,7 @@ interface Props {
 }
 
 /** Animated recovery ring — the centerpiece of the brief. */
-export function ScoreRing({ score, size = 190, strokeWidth = 13, showValue = true, delay = 250 }: Props) {
+export function ScoreRing({ score, size = 190, strokeWidth = 15, showValue = true, delay = 250 }: Props) {
   const theme = useTheme();
   const color = scoreColor(score, theme);
   const r = (size - strokeWidth) / 2;
@@ -76,6 +76,12 @@ export function ScoreRing({ score, size = 190, strokeWidth = 13, showValue = tru
       accessibilityRole="image"
       accessibilityLabel={`Recovery ${score} out of 100`}>
       <Svg width={size} height={size}>
+        <Defs>
+          <LinearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor={lighten(color, 0.35)} />
+            <Stop offset="1" stopColor={color} />
+          </LinearGradient>
+        </Defs>
         <Circle
           cx={size / 2}
           cy={size / 2}
@@ -88,7 +94,7 @@ export function ScoreRing({ score, size = 190, strokeWidth = 13, showValue = tru
           cx={size / 2}
           cy={size / 2}
           r={r}
-          stroke={color}
+          stroke="url(#ringGrad)"
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           fill="none"
@@ -122,7 +128,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   value: {
-    fontWeight: '600',
-    letterSpacing: -1,
+    fontWeight: '800',
+    fontFamily: Fonts.rounded,
+    letterSpacing: -1.5,
   },
 });

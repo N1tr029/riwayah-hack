@@ -53,8 +53,9 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 32,
-    lineHeight: 44,
-    fontWeight: 600,
+    lineHeight: 40,
+    fontWeight: 700,
+    letterSpacing: -0.5,
   },
   link: {
     lineHeight: 30,
